@@ -32,6 +32,19 @@ export function isOfficeFile(nameOrExt) {
   return OFFICE_EXTS.includes(ext.toLowerCase());
 }
 
+// Warm up LibreOffice at server start so the FIRST customer's Word/Excel upload
+// isn't slow (soffice cold-start is ~10s; after warm-up it's a second or two).
+export function warmup() {
+  try {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'qrpwarm_'));
+    const f = path.join(dir, 'warm.txt');
+    fs.writeFileSync(f, 'warmup');
+    officeToPdf(f, dir).catch(() => {}).finally(() => {
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    });
+  } catch {}
+}
+
 // Convert inputPath -> a PDF in outDir. Resolves to the produced PDF path.
 export function officeToPdf(inputPath, outDir) {
   return new Promise((resolve, reject) => {

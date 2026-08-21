@@ -13,6 +13,7 @@ import { agentRouter } from './routes/agent.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { adminRouter } from './routes/admin.js';
 import { authRouter } from './routes/auth.js';
+import { warmup as warmupOffice } from './office.js';
 
 validateProd();   // refuse to boot with insecure defaults in production
 load();           // read or seed the database
@@ -152,6 +153,7 @@ const server = app.listen(config.port, () => {
   }
   console.log(`  Payments:   ${config.paymentProvider}`);
   console.log('  ----------------------------------------\n');
+  warmupOffice(); // pre-start LibreOffice so the first Word/Excel upload is fast
 });
 
 // Graceful shutdown (so containers/systemd restart cleanly).
