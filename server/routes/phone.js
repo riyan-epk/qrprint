@@ -13,6 +13,7 @@ import { computePrice, clampInt } from '../pricing.js';
 import { canAcceptJobs, statusMessage } from '../subscription.js';
 import { createPayment } from '../payments.js';
 import { verifyCallback } from '../jazzcash.js';
+import { verifyCallback as verifySafepay } from '../safepay.js';
 import { isOfficeFile, officeToPdf } from '../office.js';
 import { uploadLimiter, payLimiter } from '../security.js';
 
@@ -187,10 +188,16 @@ phoneRouter.post('/jobs/:id/pay', payLimiter, async (req, res) => {
     return res.json(publicJob(db.job(job.id)));
   }
 
-  // Hosted checkout (JazzCash) using the shop's own credentials.
+  // Hosted checkout (JazzCash) using the shop's own credentials — form POST.
   if (result.redirect) {
     db.updateJob(job.id, { payment: { ...job.payment, provider: result.provider, txnRef: result.txnRef } });
     return res.json({ redirect: true, action: result.action, fields: result.fields });
+  }
+
+  // Hosted checkout (Safepay) — simple URL redirect.
+  if (result.redirectUrl) {
+    db.updateJob(job.id, { payment: { ...job.payment, provider: result.provider, token: result.token } });
+    return res.json({ redirectUrl: result.redirectUrl });
   }
 
   // Instant provider (not used by cash/jazzcash).
@@ -221,6 +228,31 @@ phoneRouter.post('/pay/jazzcash/callback', express.urlencoded({ extended: false 
   const status = v.ok && v.success ? 'paid' : 'failed';
   const s = shop?.slug ? `&s=${encodeURIComponent(shop.slug)}` : '';
   res.redirect(`/p/?job=${encodeURIComponent(jobId || '')}&pay=${status}${s}`);
+});
+
+// Safepay sends the result here (GET or POST). Verify the signature, mark paid.
+phoneRouter.all('/pay/safepay/callback', express.urlencoded({ extended: false }), (req, res) => {
+  const params = { ...req.query, ...(req.body || {}) };
+  const orderId = params.order_id || params.orderId || '';
+  const job = orderId ? db.job(orderId) : null;
+  const shop = job ? db.shop(job.shopId) : null;
+  const secret = shop?.payment_account?.safepay?.secretKey;
+  const v = verifySafepay(params, secret);
+  // Log the callback shape so the exact field names are confirmable after the
+  // first real payment (values omitted; keys only).
+  db.logEvent('safepay.callback', { shopId: job?.shopId, jobId: orderId, keys: Object.keys(params).join(','), verified: v.ok });
+  if (job && v.ok && job.payment.status !== 'paid') {
+    db.updateJob(job.id, {
+      payment: { ...job.payment, status: 'paid', provider: 'safepay', ref: v.tracker, paidAt: new Date().toISOString() },
+      print: { ...job.print, status: 'queued' },
+    });
+    db.logEvent('job.paid', { shopId: job.shopId, jobId: job.id, provider: 'safepay', amount: job.price.amount });
+  } else if (job && !v.ok) {
+    db.logEvent('job.pay_failed', { shopId: job.shopId, jobId: job.id, provider: 'safepay' });
+  }
+  const status = v.ok ? 'paid' : 'failed';
+  const s = shop?.slug ? `&s=${encodeURIComponent(shop.slug)}` : '';
+  res.redirect(`/p/?job=${encodeURIComponent(orderId)}&pay=${status}${s}`);
 });
 
 // --- status polling ----------------------------------------------------------

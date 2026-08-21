@@ -2,6 +2,7 @@
 // credentials, so money goes to that shop. createPayment inspects the shop's
 // payment_account and returns how the phone should proceed.
 import { buildCheckout } from './jazzcash.js';
+import { createCheckout } from './safepay.js';
 
 // Returns one of:
 //   { ok:true, mode:'cash' }                                   -> pay at the counter; shopkeeper approves
@@ -22,8 +23,9 @@ export async function createPayment(job, shop) {
   }
 
   if (method === 'safepay') {
-    // Scaffolded — completed once the shop's Safepay sandbox keys are wired/tested.
-    return { ok: false, error: 'Safepay is not enabled yet. Use Cash or JazzCash for now.' };
+    const co = await createCheckout(job, shop, acct.safepay);
+    if (!co.ok) return co;
+    return { ok: true, provider: 'safepay', redirectUrl: co.redirectUrl, token: co.token };
   }
 
   return { ok: false, error: 'No payment method configured for this shop.' };

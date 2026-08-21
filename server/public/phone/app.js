@@ -208,6 +208,12 @@ async function payAndPrint() {
       return;
     }
 
+    // Redirect provider (Safepay): go to the hosted checkout URL.
+    if (pay.redirectUrl) {
+      window.location.href = pay.redirectUrl;
+      return;
+    }
+
     // Instant provider (mock): already paid.
     currentJob = pay;
     show('statusView');
