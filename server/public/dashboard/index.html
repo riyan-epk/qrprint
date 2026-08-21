@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shop Dashboard · QRPrint</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login gate (shown only when the dashboard requires a password) -->
+  <div id="loginGate" class="login-gate hidden">
+    <form class="login-card" id="loginForm">
+      <div class="login-logo">🖨️</div>
+      <h1>Shop Dashboard</h1>
+      <p class="login-sub">Enter your Shop ID and password.</p>
+      <input id="loginShop" type="text" placeholder="Shop ID" autocomplete="username">
+      <input id="loginPw" type="password" placeholder="Password" autocomplete="current-password">
+      <button class="btn primary" type="submit">Log in</button>
+      <p class="login-err hidden" id="loginErr"></p>
+    </form>
+  </div>
+
+  <div class="shell" id="shell">
+    <header class="bar">
+      <div class="brand">🖨️ <b id="shopName">Shop</b> <span class="mode-pill" id="modePill">shop</span></div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="live">Live</button>
+        <button class="tab" data-tab="settings">Settings</button>
+        <button class="tab" data-tab="qr">QR code</button>
+        <button class="tab" id="logoutBtn" title="Log out">Log out</button>
+      </nav>
+    </header>
+
+    <!-- subscription banner -->
+    <div id="subBanner" class="subbanner hidden"></div>
+
+    <!-- LIVE TAB -->
+    <section id="tab-live" class="tabpane">
+      <div class="kpis">
+        <div class="kpi"><div class="k-label">Earned today</div><div class="k-val"><span id="kEarn">0</span> <small id="kCur">PKR</small></div></div>
+        <div class="kpi"><div class="k-label">Prints today</div><div class="k-val" id="kPrints">0</div></div>
+        <div class="kpi"><div class="k-label">In queue</div><div class="k-val" id="kQueue">0</div></div>
+        <div class="kpi warn"><div class="k-label">Needs attention</div><div class="k-val" id="kAttn">0</div></div>
+      </div>
+      <div class="printer-row" id="printerRow"></div>
+
+      <h2 class="h">Recent jobs</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Time</th><th>Document</th><th>Options</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody id="jobsBody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section id="tab-settings" class="tabpane hidden">
+      <div class="grid2">
+        <div class="panel">
+          <h2 class="h">Shop</h2>
+          <label class="fld"><span>Shop name</span><input id="setName" type="text" maxlength="60"></label>
+          <label class="fld"><span>Mode</span>
+            <select id="setMode">
+              <option value="shop">Shop (a person is present)</option>
+              <option value="kiosk">Kiosk (unattended)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="panel">
+          <h2 class="h">Printer can do</h2>
+          <label class="check"><input type="checkbox" id="capColor"> Color printing</label>
+          <label class="check"><input type="checkbox" id="capDuplex"> Auto double-sided (duplex)</label>
+          <div class="fld"><span>Paper sizes stocked</span>
+            <label class="check"><input type="checkbox" class="paperSize" value="A4"> A4</label>
+            <label class="check"><input type="checkbox" class="paperSize" value="Letter"> Letter</label>
+            <label class="check"><input type="checkbox" class="paperSize" value="Legal"> Legal</label>
+          </div>
+          <label class="fld"><span>Max file size (MB)</span><input id="capMax" type="number" min="1" max="100"></label>
+        </div>
+
+        <div class="panel">
+          <h2 class="h">Prices (PKR)</h2>
+          <label class="fld"><span>Black &amp; white / page</span><input id="prBw" type="number" min="0" step="0.5"></label>
+          <label class="fld"><span>Color / page</span><input id="prColor" type="number" min="0" step="0.5"></label>
+        </div>
+
+        <div class="panel">
+          <h2 class="h">How customers pay</h2>
+          <label class="fld"><span>Payment method</span>
+            <select id="payProvider">
+              <option value="cash">Cash at counter (you approve each job)</option>
+              <option value="jazzcash">JazzCash online (your merchant account)</option>
+              <option value="safepay">Safepay online (coming soon)</option>
+            </select>
+          </label>
+
+          <div id="cashNote" class="hint">Customers upload &amp; you collect cash, then tap <b>Approve</b> on the job to print. No setup needed.</div>
+
+          <div id="jazzcashFields" class="hidden">
+            <p class="hint">Your JazzCash <b>merchant API</b> credentials (from a JazzCash Business account). Payments go straight to you.</p>
+            <label class="fld"><span>Merchant ID</span><input id="jcMerchant" type="text" autocomplete="off"></label>
+            <label class="fld"><span>Password</span><input id="jcPassword" type="text" autocomplete="off"></label>
+            <label class="fld"><span>Integrity Salt</span><input id="jcSalt" type="text" autocomplete="off"></label>
+          </div>
+
+          <div id="safepayFields" class="hidden">
+            <p class="hint">Your Safepay keys. Safepay online is being finalised — use Cash or JazzCash for now.</p>
+            <label class="fld"><span>Environment</span>
+              <select id="spEnv"><option value="sandbox">Sandbox (test)</option><option value="production">Production (live)</option></select>
+            </label>
+            <label class="fld"><span>API Key</span><input id="spKey" type="text" autocomplete="off"></label>
+            <label class="fld"><span>Secret Key</span><input id="spSecret" type="text" autocomplete="off"></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2 class="h">Change password</h2>
+          <label class="fld"><span>Current password</span><input id="pwCurrent" type="password" autocomplete="current-password"></label>
+          <label class="fld"><span>New password</span><input id="pwNew" type="password" autocomplete="new-password"></label>
+          <label class="fld"><span>Confirm new password</span><input id="pwConfirm" type="password" autocomplete="new-password"></label>
+          <button class="btn" id="changePwBtn">Update password</button>
+          <span id="pwMsg" class="save-msg"></span>
+        </div>
+      </div>
+      <div class="save-row">
+        <button class="btn primary" id="saveSettings">Save settings</button>
+        <span id="saveMsg" class="save-msg"></span>
+      </div>
+    </section>
+
+    <!-- QR TAB -->
+    <section id="tab-qr" class="tabpane hidden">
+      <div class="panel qrpanel">
+        <h2 class="h">Print this and stick it on the counter</h2>
+        <p class="hint">Customers scan it to open the print page. Works when their phone is on the same WiFi as this computer (V1). Later, a public URL lets them use mobile data.</p>
+        <div class="qrbox"><img id="qrImg" alt="QR code" width="240" height="240"></div>
+        <div class="qrurl" id="qrUrl">—</div>
+        <button class="btn" id="printQr">🖨️ Print this QR</button>
+      </div>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

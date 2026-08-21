@@ -1,0 +1,20 @@
+{
+  "server_url": "https://print.mystay.live",
+  "agent_key": "PASTE-YOUR-AGENT-KEY-HERE",
+
+  "print_mode": "live",
+
+  "printer_name": null,
+  "paper_size": "A4",
+
+  "sumatra_path": "SumatraPDF.exe",
+
+  "poll_seconds": 3,
+
+  "_help": {
+    "agent_key": "The key your provider gave you when they created your shop.",
+    "print_mode": "'live' = print for real. 'dry' = test only (logs, no paper).",
+    "printer_name": "null = your default Windows printer, or the exact printer name.",
+    "sumatra_path": "Usually leave as-is; the agent auto-finds SumatraPDF after setup."
+  }
+}

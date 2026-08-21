@@ -1,0 +1,6 @@
+# Replace print.yourdomain.com with your real domain.
+# Caddy automatically obtains and renews an HTTPS certificate for it.
+print.yourdomain.com {
+    encode gzip
+    reverse_proxy app:3000
+}

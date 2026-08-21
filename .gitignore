@@ -1,0 +1,17 @@
+node_modules/
+data/
+*.log
+agent/config.json
+.env
+.DS_Store
+
+__pycache__/
+*.pyc
+
+# build output
+agent/dist/
+agent/build_tmp/
+*.spec
+
+# packaged build zips
+*.zip

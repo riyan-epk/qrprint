@@ -1,0 +1,37 @@
+# Hybrid/cloud deployment: QRPrint server + Caddy for automatic HTTPS.
+#
+# 1. Point your domain's DNS A-record at this server's IP.
+# 2. Put your domain in .env (PUBLIC_URL) and in the Caddyfile.
+# 3. docker compose up -d
+# Caddy fetches a real Let's Encrypt certificate automatically — no manual TLS.
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DATA_DIR=/data
+      - TRUST_PROXY=1
+    volumes:
+      - qrprint-data:/data
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  qrprint-data:
+  caddy-data:
+  caddy-config:

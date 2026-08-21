@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Provider Console · QRPrint</title>
+  <style>
+    :root{--bg:#0f1419;--panel:#171d24;--surface:#1f2730;--line:#2b343d;--ink:#eef2f5;--muted:#98a3ad;--accent:#2bb3bd;--good:#3ecf8e;--warn:#e3a53a;--crit:#e5675c}
+    @media(prefers-color-scheme:light){:root{--bg:#eef1f4;--panel:#fff;--surface:#f4f6f8;--line:#e3e7eb;--ink:#141a1f;--muted:#5c6771;--accent:#0c8f99}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;line-height:1.5}
+    .wrap{max-width:840px;margin:32px auto;padding:0 18px}
+    h1{font-size:1.4rem;margin:0 0 4px}.tag{color:var(--muted);font-size:.85rem;margin:0 0 20px}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+    .hidden{display:none!important}
+    label{display:block;font-size:.8rem;color:var(--muted);margin:0 0 5px}
+    input{width:100%;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:10px 12px;font-size:.95rem}
+    .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:8px 14px;font-weight:600;cursor:pointer;font-size:.85rem}
+    .btn:hover{border-color:var(--accent)}
+    .btn.crit{background:var(--crit);border-color:var(--crit);color:#fff}
+    .btn.good{background:var(--good);border-color:var(--good);color:#0f1419}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#0f1419}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+    .row>div{flex:1;min-width:120px}
+    .err{color:var(--crit);font-size:.85rem;margin-top:8px}
+    h2{font-size:1.05rem;margin:0 0 12px}
+    .shop{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--surface)}
+    .shop-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .shop-name{font-weight:700;font-size:1.05rem}
+    .shop-id{font-family:ui-monospace,monospace;color:var(--muted);font-size:.8rem}
+    .pill{font-size:.72rem;padding:3px 9px;border-radius:999px;font-weight:600}
+    .pill.active{background:color-mix(in srgb,var(--good) 20%,transparent);color:var(--good)}
+    .pill.grace{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn)}
+    .pill.suspended{background:color-mix(in srgb,var(--crit) 20%,transparent);color:var(--crit)}
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+    .shop-meta{color:var(--muted);font-size:.82rem;margin:8px 0}
+    .shop-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .detail{margin-top:12px;padding:12px;background:var(--bg);border:1px solid var(--line);border-radius:9px;font-size:.82rem}
+    .detail code{font-family:ui-monospace,monospace;word-break:break-all;background:var(--surface);padding:2px 6px;border-radius:5px;display:inline-block;margin:2px 0}
+    .detail div{margin-bottom:8px}
+    .events{font-family:ui-monospace,monospace;font-size:.76rem;color:var(--muted);max-height:200px;overflow:auto}
+    .events div{padding:2px 0;border-bottom:1px solid var(--line)}
+    a{color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🔒 Provider Console</h1>
+    <p class="tag">Create and manage all your shops.</p>
+
+    <!-- login -->
+    <div class="panel" id="loginPanel">
+      <label>Admin key</label>
+      <input id="key" type="password" placeholder="admin key from the server .env">
+      <div class="row" style="margin-top:12px"><button class="btn good" id="loginBtn">Unlock</button></div>
+      <div class="err hidden" id="loginErr"></div>
+    </div>
+
+    <div id="console" class="hidden">
+      <!-- add shop -->
+      <div class="panel">
+        <h2>➕ Add a shop</h2>
+        <div class="row">
+          <div><label>Shop name</label><input id="newName" type="text" placeholder="e.g. Ali Photostat"></div>
+          <div><label>Dashboard password</label><input id="newPass" type="text" placeholder="give to the shopkeeper"></div>
+          <div style="flex:0 0 120px"><label>Fee (PKR/mo)</label><input id="newFee" type="number" value="1500"></div>
+          <button class="btn primary" id="addBtn">Create</button>
+        </div>
+        <div class="err hidden" id="addErr"></div>
+        <div class="detail hidden" id="newShopBox"></div>
+      </div>
+
+      <!-- shops list -->
+      <div class="panel">
+        <h2>🏪 Shops (<span id="shopCount">0</span>)</h2>
+        <div id="shops"></div>
+      </div>
+
+      <!-- events -->
+      <div class="panel">
+        <h2>📋 Activity</h2>
+        <div class="events" id="events"></div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

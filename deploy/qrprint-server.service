@@ -1,0 +1,26 @@
+# systemd unit for the QRPrint SERVER on a Linux VPS (Oracle/Ubuntu).
+# Install:
+#   sudo cp deploy/qrprint-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now qrprint-server
+# Logs:
+#   journalctl -u qrprint-server -f
+#
+# Assumes the project is at /home/ubuntu/printing and node is at /usr/bin/node.
+
+[Unit]
+Description=QRPrint server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/printing
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+# systemd unit for the print agent on a Raspberry Pi / Linux shop box.
+# Install:
+#   sudo cp deploy/qrprint-agent.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now qrprint-agent
+# Logs:
+#   journalctl -u qrprint-agent -f
+#
+# Edit User and the paths below to match your machine.
+
+[Unit]
+Description=QRPrint shop print agent
+After=network-online.target cups.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/printing/agent
+ExecStart=/usr/bin/python3 -u agent.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
