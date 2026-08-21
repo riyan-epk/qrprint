@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import QRCode from 'qrcode';
 import { config, validateProd } from './config.js';
 import { load, db } from './db.js';
-import { phoneRouter, cleanupPending, recoverStalePrints } from './routes/phone.js';
+import { phoneRouter, cleanupPending, recoverStalePrints, sweepSafepay } from './routes/phone.js';
 import { agentRouter } from './routes/agent.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { adminRouter } from './routes/admin.js';
@@ -133,6 +133,10 @@ cleanupTimer.unref();
 // Recover jobs stranded by a stopped agent (re-queue stale 'printing' jobs).
 const recoverTimer = setInterval(recoverStalePrints, 60 * 1000);
 recoverTimer.unref();
+
+// Confirm Safepay payments even if the customer didn't return to the page.
+const sweepTimer = setInterval(() => { sweepSafepay().catch(() => {}); }, 20 * 1000);
+sweepTimer.unref();
 
 const server = app.listen(config.port, () => {
   const url = config.publicUrl || `http://${lanIp()}:${config.port}`;

@@ -13,7 +13,7 @@ import { computePrice, clampInt } from '../pricing.js';
 import { canAcceptJobs, statusMessage } from '../subscription.js';
 import { createPayment } from '../payments.js';
 import { verifyCallback } from '../jazzcash.js';
-import { verifyCallback as verifySafepay } from '../safepay.js';
+import { verifyCallback as verifySafepay, checkTrackerPaid } from '../safepay.js';
 import { isOfficeFile, officeToPdf } from '../office.js';
 import { uploadLimiter, payLimiter } from '../security.js';
 
@@ -256,11 +256,43 @@ phoneRouter.all('/pay/safepay/callback', express.urlencoded({ extended: false })
 });
 
 // --- status polling ----------------------------------------------------------
-phoneRouter.get('/jobs/:id', (req, res) => {
-  const job = db.job(req.params.id);
+phoneRouter.get('/jobs/:id', async (req, res) => {
+  let job = db.job(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found.' });
+  // If it's a Safepay job still unpaid, confirm directly with Safepay.
+  if (job.payment.provider === 'safepay' && job.payment.status === 'unpaid' && job.payment.token) {
+    await settleSafepay(job);
+    job = db.job(req.params.id);
+  }
   res.json(publicJob(job));
 });
+
+// Ask Safepay whether a job's tracker is paid; if so, mark it paid + queue it.
+async function settleSafepay(job) {
+  const shop = db.shop(job.shopId);
+  const env = shop?.payment_account?.safepay?.environment;
+  if (await checkTrackerPaid(job.payment.token, env)) {
+    db.updateJob(job.id, {
+      payment: { ...job.payment, status: 'paid', ref: job.payment.token, paidAt: new Date().toISOString() },
+      print: { ...job.print, status: 'queued' },
+    });
+    db.logEvent('job.paid', { shopId: job.shopId, jobId: job.id, provider: 'safepay', amount: job.price.amount });
+    return true;
+  }
+  return false;
+}
+
+// Background sweep: catch Safepay payments even if the customer never returned
+// to the print page (e.g. they closed the tab on Safepay's success screen).
+export async function sweepSafepay() {
+  const cutoff = Date.now() - 30 * 60 * 1000; // only recent jobs
+  for (const job of db.jobs()) {
+    if (job.payment.provider === 'safepay' && job.payment.status === 'unpaid'
+        && job.payment.token && new Date(job.createdAt).getTime() > cutoff) {
+      await settleSafepay(job);
+    }
+  }
+}
 
 // --- helpers -----------------------------------------------------------------
 

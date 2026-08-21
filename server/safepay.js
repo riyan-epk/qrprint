@@ -37,15 +37,31 @@ export async function createCheckout(job, shop, creds) {
 
   // 2) build the hosted-checkout redirect URL
   const base = config.publicUrl.replace(/\/$/, '');
+  // Return the customer straight to the print page; the server confirms the
+  // payment with Safepay directly (checkTrackerPaid), so we don't depend on
+  // Safepay's redirect/callback behaviour.
+  const ret = base + '/p/?job=' + encodeURIComponent(job.id) + '&s=' + encodeURIComponent(shop.slug || '');
   const url = new URL(CHECKOUT[env]);
   url.searchParams.set('env', env);
   url.searchParams.set('beacon', token);
   url.searchParams.set('source', 'qrprint');
   url.searchParams.set('order_id', job.id);
-  url.searchParams.set('redirect_url', base + '/api/phone/pay/safepay/callback');
-  url.searchParams.set('cancel_url', base + '/p/?job=' + encodeURIComponent(job.id) + '&pay=failed');
+  url.searchParams.set('redirect_url', ret);
+  url.searchParams.set('cancel_url', ret + '&pay=cancelled');
 
   return { ok: true, redirectUrl: url.toString(), token };
+}
+
+// Authoritative check: ask Safepay whether this tracker has been paid.
+// A paid tracker has state 'TRACKER_ENDED' with a populated transaction.
+export async function checkTrackerPaid(token, environment) {
+  const env = environment === 'production' ? 'production' : 'sandbox';
+  try {
+    const r = await fetch(API[env] + '/order/v1/' + token);
+    if (!r.ok) return false;
+    const d = await r.json().catch(() => ({}));
+    return d?.data?.state === 'TRACKER_ENDED' && !!d?.data?.transaction?.token;
+  } catch { return false; }
 }
 
 // Verify the result Safepay returns. Signature = HMAC-SHA256(tracker, secretKey).
