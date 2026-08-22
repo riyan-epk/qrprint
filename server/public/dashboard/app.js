@@ -101,20 +101,29 @@ $('jobsBody').addEventListener('click', (e) => {
 });
 
 async function approveJob(id) {
-  try { await api(`/jobs/${id}/approve`, { method: 'POST' }); refresh(); } catch (e) { alert(e.message); }
+  try { await api(`/jobs/${id}/approve`, { method: 'POST' }); UI.toast('Approved — printing now', 'good'); refresh(); }
+  catch (e) { UI.alert({ title: 'Could not approve', message: e.message, icon: 'crit' }); }
 }
 async function cancelJob(id) {
-  if (!confirm('Cancel this job? It will be removed.')) return;
-  try { await api(`/jobs/${id}/cancel`, { method: 'POST' }); refresh(); } catch (e) { alert(e.message); }
+  const ok = await UI.confirm({ title: 'Cancel this job?', message: 'It will be removed from the queue.', icon: 'warn', okText: 'Cancel job', cancelText: 'Keep', danger: true });
+  if (!ok) return;
+  try { await api(`/jobs/${id}/cancel`, { method: 'POST' }); UI.toast('Job cancelled', 'warn'); refresh(); }
+  catch (e) { UI.alert({ title: 'Could not cancel', message: e.message, icon: 'crit' }); }
 }
 
 async function reprintJob(id) {
-  try { await api(`/jobs/${id}/reprint`, { method: 'POST' }); refresh(); } catch (e) { alert(e.message); }
+  try { await api(`/jobs/${id}/reprint`, { method: 'POST' }); UI.toast('Sent to the printer again', 'good'); refresh(); }
+  catch (e) { UI.alert({ title: 'Could not reprint', message: e.message, icon: 'crit' }); }
 }
 async function refundJob(id) {
-  if (!confirm('Refund this job? This cannot be undone.')) return;
-  try { const r = await api(`/jobs/${id}/refund`, { method: 'POST' }); refresh(); if (r.manual) alert('Marked refunded. Complete the actual refund in your payment app.'); }
-  catch (e) { alert(e.message); }
+  const ok = await UI.confirm({ title: 'Refund this job?', message: 'This cannot be undone.', icon: 'warn', okText: 'Refund', danger: true });
+  if (!ok) return;
+  try {
+    const r = await api(`/jobs/${id}/refund`, { method: 'POST' });
+    refresh();
+    if (r.manual) UI.alert({ title: 'Marked refunded', message: 'Now hand the money back in your payment app to complete it.', icon: 'good' });
+    else UI.toast('Refunded', 'good');
+  } catch (e) { UI.alert({ title: 'Could not refund', message: e.message, icon: 'crit' }); }
 }
 
 // --- SETTINGS ---
@@ -169,6 +178,7 @@ $('saveSettings').addEventListener('click', async () => {
   try {
     await api('/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     $('saveMsg').textContent = 'Saved ✓';
+    if (window.UI) UI.toast('Settings saved', 'good');
     setTimeout(() => $('saveMsg').textContent = '', 2500);
     refresh();
   } catch (e) { $('saveMsg').style.color = 'var(--crit)'; $('saveMsg').textContent = e.message; }
@@ -188,6 +198,7 @@ $('changePwBtn').addEventListener('click', async () => {
     });
     msg.style.color = 'var(--good)';
     msg.textContent = 'Password updated ✓';
+    if (window.UI) UI.toast('Password updated', 'good');
     $('pwCurrent').value = $('pwNew').value = $('pwConfirm').value = '';
     setTimeout(() => msg.textContent = '', 3000);
   } catch (e) { msg.style.color = 'var(--crit)'; msg.textContent = e.message; }

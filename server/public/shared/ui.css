@@ -1,0 +1,80 @@
+/* Shared UI layer: dialogs, toasts, and motion — used by phone/dashboard/admin.
+   Theme-aware (dark default, light via prefers-color-scheme) and matches the
+   app's teal accent. Respects reduced-motion. */
+:root{
+  --ui-accent:#2bb3bd; --ui-accent-ink:#08171a;
+  --ui-bg:#141a20; --ui-card:#1c242c; --ui-line:#2c363f; --ui-ink:#eef2f5; --ui-muted:#9aa5af;
+  --ui-good:#3ecf8e; --ui-warn:#e3a53a; --ui-crit:#e5675c;
+  --ui-shadow:0 24px 60px -20px rgba(0,0,0,.6);
+}
+@media (prefers-color-scheme:light){
+  :root{ --ui-bg:#eef1f4; --ui-card:#ffffff; --ui-line:#e4e8ec; --ui-ink:#141a1f; --ui-muted:#5c6771;
+    --ui-accent:#0c8f99; --ui-accent-ink:#ffffff; --ui-shadow:0 24px 60px -22px rgba(20,30,40,.28); }
+}
+
+/* backdrop + dialog */
+.ui-backdrop{
+  position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:20px;
+  background:rgba(6,10,14,.55); backdrop-filter:blur(3px);
+  animation:ui-fade .18s ease both;
+}
+.ui-backdrop.closing{ animation:ui-fade .16s ease reverse both; }
+.ui-dialog{
+  background:var(--ui-card); color:var(--ui-ink);
+  width:100%; max-width:380px; border:1px solid var(--ui-line); border-radius:18px;
+  padding:24px 22px 20px; box-shadow:var(--ui-shadow); text-align:center;
+  animation:ui-pop .26s cubic-bezier(.2,.9,.3,1.2) both;
+}
+.ui-backdrop.closing .ui-dialog{ animation:ui-pop .16s ease reverse both; }
+.ui-icon{
+  width:56px; height:56px; border-radius:50%; margin:0 auto 14px; display:grid; place-items:center;
+  font-size:1.7rem; background:color-mix(in srgb,var(--ui-accent) 16%,transparent);
+}
+.ui-icon.good{ background:color-mix(in srgb,var(--ui-good) 18%,transparent); }
+.ui-icon.warn{ background:color-mix(in srgb,var(--ui-warn) 18%,transparent); }
+.ui-icon.crit{ background:color-mix(in srgb,var(--ui-crit) 18%,transparent); }
+.ui-title{ font-size:1.15rem; font-weight:700; margin:0 0 6px; }
+.ui-msg{ color:var(--ui-muted); font-size:.94rem; margin:0 0 18px; line-height:1.5; }
+.ui-input{
+  width:100%; background:var(--ui-bg); border:1px solid var(--ui-line); color:var(--ui-ink);
+  border-radius:11px; padding:11px 13px; font-size:1rem; margin-bottom:16px; outline:none;
+  transition:border-color .15s, box-shadow .15s;
+}
+.ui-input:focus{ border-color:var(--ui-accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--ui-accent) 25%,transparent); }
+.ui-actions{ display:flex; gap:10px; }
+.ui-btn{
+  flex:1; padding:12px 16px; border-radius:12px; font-size:.95rem; font-weight:700; cursor:pointer;
+  border:1px solid var(--ui-line); background:var(--ui-bg); color:var(--ui-ink);
+  transition:transform .12s ease, filter .15s ease, background .15s;
+}
+.ui-btn:hover{ filter:brightness(1.08); }
+.ui-btn:active{ transform:scale(.96); }
+.ui-btn.primary{ background:var(--ui-accent); color:var(--ui-accent-ink); border-color:var(--ui-accent); }
+.ui-btn.danger{ background:var(--ui-crit); color:#fff; border-color:var(--ui-crit); }
+.ui-btn:focus-visible{ outline:2px solid var(--ui-accent); outline-offset:2px; }
+
+/* toasts */
+.ui-toasts{ position:fixed; left:0; right:0; bottom:22px; z-index:1100; display:flex; flex-direction:column;
+  align-items:center; gap:10px; pointer-events:none; padding:0 16px; }
+.ui-toast{
+  pointer-events:auto; max-width:440px; width:max-content; display:flex; align-items:center; gap:10px;
+  background:var(--ui-card); color:var(--ui-ink); border:1px solid var(--ui-line);
+  border-left:4px solid var(--ui-accent); border-radius:12px; padding:12px 16px;
+  box-shadow:var(--ui-shadow); font-size:.92rem; font-weight:500;
+  animation:ui-toast-in .3s cubic-bezier(.2,.9,.3,1.15) both;
+}
+.ui-toast.good{ border-left-color:var(--ui-good); }
+.ui-toast.warn{ border-left-color:var(--ui-warn); }
+.ui-toast.crit{ border-left-color:var(--ui-crit); }
+.ui-toast.closing{ animation:ui-toast-out .22s ease both; }
+.ui-toast .ui-t-ic{ font-size:1.1rem; }
+
+@keyframes ui-fade{ from{opacity:0} to{opacity:1} }
+@keyframes ui-pop{ from{opacity:0; transform:translateY(8px) scale(.96)} to{opacity:1; transform:none} }
+@keyframes ui-toast-in{ from{opacity:0; transform:translateY(14px) scale(.98)} to{opacity:1; transform:none} }
+@keyframes ui-toast-out{ to{opacity:0; transform:translateY(10px)} }
+
+@media (prefers-reduced-motion:reduce){
+  .ui-backdrop,.ui-dialog,.ui-toast,.ui-backdrop.closing,.ui-backdrop.closing .ui-dialog{ animation-duration:.01ms !important; }
+  .ui-btn:active{ transform:none; }
+}

@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Provider Console · QRPrint</title>
+  <link rel="stylesheet" href="/shared/ui.css">
   <style>
     :root{--bg:#0f1419;--panel:#171d24;--surface:#1f2730;--line:#2b343d;--ink:#eef2f5;--muted:#98a3ad;--accent:#2bb3bd;--good:#3ecf8e;--warn:#e3a53a;--crit:#e5675c}
     @media(prefers-color-scheme:light){:root{--bg:#eef1f4;--panel:#fff;--surface:#f4f6f8;--line:#e3e7eb;--ink:#141a1f;--muted:#5c6771;--accent:#0c8f99}}
@@ -40,6 +41,13 @@
     .events{font-family:ui-monospace,monospace;font-size:.76rem;color:var(--muted);max-height:200px;overflow:auto}
     .events div{padding:2px 0;border-bottom:1px solid var(--line)}
     a{color:var(--accent)}
+    .btn{transition:transform .12s ease,filter .15s}.btn:hover{filter:brightness(1.08)}.btn:active{transform:scale(.96)}
+    .panel{animation:aIn .38s both}.shop{animation:aIn .3s both;transition:border-color .18s,transform .15s}
+    .shop:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+    input{transition:border-color .15s,box-shadow .15s}
+    input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+    @keyframes aIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
   </style>
 </head>
 <body>
@@ -82,6 +90,7 @@
       </div>
     </div>
   </div>
+  <script src="/shared/ui.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

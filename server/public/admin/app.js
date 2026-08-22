@@ -46,6 +46,7 @@ $('addBtn').addEventListener('click', async () => {
       <div>Agent key (for their print agent's config.json): <code>${shop.agentKey}</code></div>`;
     box.classList.remove('hidden');
     refresh();
+    if (window.UI) UI.toast('Shop created', 'good');
   } catch (e) { showErr('addErr', e.message); }
 });
 
@@ -94,14 +95,20 @@ $('shops').addEventListener('click', async (e) => {
   if (!btn) return;
   const id = btn.dataset.id, a = btn.dataset.a;
   try {
-    if (a === 'suspend') { await api(`/shops/${id}/suspend`, { method: 'POST' }); refresh(); }
-    else if (a === 'activate') { await api(`/shops/${id}/activate`, { method: 'POST', body: JSON.stringify({ extendDays: 30 }) }); refresh(); }
+    if (a === 'suspend') {
+      const ok = await UI.confirm({ title: 'Suspend this shop?', message: 'Their self-service stops accepting new jobs until you reactivate.', icon: 'warn', okText: 'Suspend', danger: true });
+      if (!ok) return;
+      await api(`/shops/${id}/suspend`, { method: 'POST' }); UI.toast('Shop suspended', 'warn'); refresh();
+    }
+    else if (a === 'activate') { await api(`/shops/${id}/activate`, { method: 'POST', body: JSON.stringify({ extendDays: 30 }) }); UI.toast('Reactivated · +30 days', 'good'); refresh(); }
     else if (a === 'password') {
-      const pw = prompt('New dashboard password for this shop (min 4 chars):');
-      if (pw) { await api(`/shops/${id}/password`, { method: 'POST', body: JSON.stringify({ password: pw }) }); alert('Password updated.'); refresh(); }
+      const pw = await UI.prompt({ title: 'Set dashboard password', message: 'Give this to the shopkeeper (min 4 characters).', input: { placeholder: 'New password' } });
+      if (pw && pw.length >= 4) { await api(`/shops/${id}/password`, { method: 'POST', body: JSON.stringify({ password: pw }) }); UI.toast('Password updated', 'good'); refresh(); }
+      else if (pw !== null) UI.alert({ title: 'Too short', message: 'Password must be at least 4 characters.', icon: 'warn' });
     }
     else if (a === 'delete') {
-      if (confirm('Delete this shop? This cannot be undone.')) { await api(`/shops/${id}`, { method: 'DELETE' }); refresh(); }
+      const ok = await UI.confirm({ title: 'Delete this shop?', message: 'This cannot be undone.', icon: 'crit', okText: 'Delete', danger: true });
+      if (ok) { await api(`/shops/${id}`, { method: 'DELETE' }); UI.toast('Shop deleted', 'warn'); refresh(); }
     }
     else if (a === 'details') {
       const d = await api(`/shops/${id}`);
@@ -116,14 +123,14 @@ $('shops').addEventListener('click', async (e) => {
       box.classList.toggle('hidden');
     }
     else if (a === 'rotate') {
-      if (confirm('Rotate the agent key? The old key stops working — update the shop’s agent config.')) {
+      const ok = await UI.confirm({ title: 'Rotate the agent key?', message: 'The old key stops working — you must update the shop’s agent config with the new key.', icon: 'warn', okText: 'Rotate' });
+      if (ok) {
         const r = await api(`/shops/${id}/rotate-agent-key`, { method: 'POST' });
-        alert('New agent key:\n' + r.agentKey);
-        const d = await api(`/shops/${id}`); // refresh details
+        await UI.alert({ title: 'New agent key', message: r.agentKey, icon: 'good', okText: 'Copy is manual — OK' });
         refresh();
       }
     }
-  } catch (err) { alert(err.message); }
+  } catch (err) { UI.alert({ title: 'Something went wrong', message: err.message, icon: 'crit' }); }
 });
 
 async function loadEvents() {

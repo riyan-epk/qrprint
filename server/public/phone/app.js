@@ -16,6 +16,7 @@ let file = null;      // { fileId, pages, sizeMb }
 let currentJob = null;
 let poll = null;
 let PAY_LABEL = 'Pay & Print';
+let lastStatus = null;
 
 const state = { copies: 1, color: false, duplex: 'single', pageRange: '', paperSize: 'A4' };
 
@@ -255,6 +256,18 @@ function renderStatus(j) {
   $('stIcon').textContent = icon;
   $('stTitle').textContent = title;
   $('stMsg').textContent = msg;
+
+  // Animate + notify only when the status actually changes.
+  if (j.status !== lastStatus) {
+    const ic = $('stIcon');
+    ic.classList.remove('pop'); void ic.offsetWidth; ic.classList.add('pop');
+    if (window.UI) {
+      if (j.status === 'done') UI.toast('Printed! Collect your pages 🎉', 'good');
+      else if (j.status === 'refunded') UI.toast('Refunded — the print could not complete', 'warn');
+      else if (j.status === 'failed') UI.toast('Could not print — please ask the shopkeeper', 'crit');
+    }
+    lastStatus = j.status;
+  }
   $('stMeta').innerHTML = `
     <div><span>Document</span><span>${escapeHtml(j.file.originalName)}</span></div>
     <div><span>Pages</span><span>${j.price.totalPagesPrinted} printed</span></div>
@@ -264,7 +277,7 @@ function renderStatus(j) {
 
 function resetToUpload() {
   clearInterval(poll);
-  file = null; currentJob = null;
+  file = null; currentJob = null; lastStatus = null;
   $('fileInput').value = '';
   $('uploadErr').classList.add('hidden');
   show('uploadView');

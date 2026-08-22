@@ -84,6 +84,34 @@ tr:last-child td{border-bottom:none}
 .login-err{color:var(--crit); font-size:.85rem; margin:10px 0 0}
 #logoutBtn{color:var(--muted)}
 
+/* ---- polish: transitions & motion (no layout change) ---- */
+.tab{transition:background .18s, color .18s, border-color .18s, transform .1s}
+.tab:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.tab:active{transform:scale(.96)}
+.tabpane:not(.hidden){animation:dashIn .32s cubic-bezier(.2,.9,.3,1) both}
+.kpi{transition:transform .18s ease, border-color .18s; animation:dashIn .4s both}
+.kpi:hover{transform:translateY(-3px); border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.kpis .kpi:nth-child(2){animation-delay:.05s}
+.kpis .kpi:nth-child(3){animation-delay:.1s}
+.kpis .kpi:nth-child(4){animation-delay:.15s}
+.k-val{font-variant-numeric:tabular-nums}
+.panel{animation:dashIn .38s both}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.badge{transition:background .2s}
+.btn{transition:transform .12s ease, filter .15s, background .18s}
+.btn:hover{filter:brightness(1.07)}
+.btn:active{transform:scale(.96)}
+.rowbtn{transition:transform .12s ease, border-color .15s, background .15s}
+.rowbtn:active{transform:scale(.93)}
+.fld input,.fld select{transition:border-color .15s, box-shadow .15s}
+.fld input:focus,.fld select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.login-card{animation:popIn .4s cubic-bezier(.2,.9,.3,1.15) both}
+.subbanner{animation:dashIn .35s both}
+@keyframes dashIn{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+@keyframes popIn{from{opacity:0; transform:translateY(10px) scale(.97)} to{opacity:1; transform:none}}
+@media (prefers-reduced-motion:reduce){ *{animation-duration:.01ms !important; transition-duration:.01ms !important} }
+
 @media print{
   body{background:#fff}
   .bar,.tabs,.subbanner,.kpis,.printer-row,.hint,.btn{display:none !important}

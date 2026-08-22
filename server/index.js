@@ -72,6 +72,7 @@ const staticOpts = {
   setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
 };
 const pub = path.join(config.root, 'server', 'public');
+app.use('/shared', express.static(path.join(pub, 'shared'), staticOpts));
 app.use('/p', express.static(path.join(pub, 'phone'), staticOpts));
 app.use('/dashboard', express.static(path.join(pub, 'dashboard'), staticOpts));
 app.use('/admin', express.static(path.join(pub, 'admin'), staticOpts));
