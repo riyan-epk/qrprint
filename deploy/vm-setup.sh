@@ -99,7 +99,7 @@ case "$ARCH" in
 esac
 curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/$CF" -o /usr/local/bin/cloudflared
 chmod +x /usr/local/bin/cloudflared
-cloudflared service install "$TOKEN"
+/usr/local/bin/cloudflared service install "$TOKEN"
 
 ADMIN_KEY="$(grep '^ADMIN_KEY=' "$REPO_DIR/.env" | cut -d= -f2)"
 echo ""
