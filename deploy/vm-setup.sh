@@ -35,14 +35,24 @@ else
 fi
 echo ">> Package manager: $PM"
 
-echo ">> Installing Node.js, git, LibreOffice ..."
+echo ">> Installing Node.js + git ..."
 if [ "$PM" = "apt" ]; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt install -y nodejs git libreoffice --no-install-recommends
-  apt install -y fonts-liberation || true
+  apt install -y nodejs git
 else
   curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-  dnf install -y nodejs git libreoffice
+  dnf install -y nodejs git
+fi
+
+echo ">> Installing LibreOffice (for Word/Excel) — best effort ..."
+if [ "$PM" = "apt" ]; then
+  apt install -y libreoffice --no-install-recommends fonts-liberation \
+    || echo "WARN: LibreOffice not installed — Word/Excel disabled; PDF/image still work."
+else
+  # Oracle Linux / RHEL 9 has no meta 'libreoffice' package — use sub-packages.
+  dnf install -y libreoffice-writer libreoffice-calc libreoffice-impress \
+    || dnf groupinstall -y "Office Suite and Productivity" \
+    || echo "WARN: LibreOffice not installed — Word/Excel disabled; PDF/image still work."
 fi
 
 # --- app deps + config -----------------------------------------------------
