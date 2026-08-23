@@ -53,20 +53,20 @@ const body = Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n') + '\
 fs.writeFileSync(ENV, body);
 console.log(`✓ Wrote ${ENV}`);
 
-// Optionally set the dashboard password now (works even before first run).
+// Optionally set a password for the starter shop ("main"). In multi-tenant use,
+// you normally create each shop (with its own password) in the /admin/ console.
 if (password) {
-  // Import after .env exists so config picks it up.
   const { db, load } = await import('../server/db.js');
   const { hashPassword } = await import('../server/security.js');
   load();
-  db.updateShop({ auth: { passwordHash: hashPassword(password) } });
-  console.log('✓ Dashboard password set.');
-} else {
-  console.log('ℹ  No --password given. Set one before production:');
-  console.log('     node scripts/setup.mjs --password "your-password"');
+  const shop = db.firstShop();
+  if (shop) {
+    db.updateShop(shop.id, { auth: { passwordHash: hashPassword(password) } });
+    console.log(`✓ Password set for the starter shop (Shop ID: ${shop.slug}).`);
+  }
 }
 
-console.log('\nGenerated keys (store safely):');
-console.log('  AGENT_KEY =', values.AGENT_KEY);
-console.log('  ADMIN_KEY =', values.ADMIN_KEY);
-console.log('\nPut AGENT_KEY into agent/config.json on the shop machine.');
+console.log('\n--- Keys (store safely) ---');
+console.log('  ADMIN_KEY =', values.ADMIN_KEY, '  <- log into /admin/ with this to manage shops');
+console.log('  AGENT_KEY =', values.AGENT_KEY, '  <- the starter shop\'s print-agent key');
+console.log('\nManage shops (each with its own dashboard password) in the /admin/ Provider Console.');

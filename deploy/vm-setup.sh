@@ -4,17 +4,19 @@
 # as a service plus the Cloudflare tunnel.
 #
 # Usage (run from inside the cloned repo):
-#   sudo bash deploy/vm-setup.sh "<dashboard-password>" "<cloudflare-tunnel-token>"
+#   sudo bash deploy/vm-setup.sh "<cloudflare-tunnel-token>"
+#   (optionally add a starter-shop password: ... "<tunnel-token>" "<starter-password>")
 #
+# You manage shops — each with its OWN dashboard password — later in /admin/.
 # Works on Ubuntu/Debian (apt) and Oracle Linux/RHEL (dnf).
 set -e
 
-PW="${1:-}"
-TOKEN="${2:-}"
+TOKEN="${1:-}"
+PW="${2:-}"
 PUBLIC_URL="${3:-https://print.mystay.live}"
 
-if [ -z "$PW" ] || [ -z "$TOKEN" ]; then
-  echo "Usage: sudo bash deploy/vm-setup.sh \"<dashboard-password>\" \"<tunnel-token>\" [public-url]"
+if [ -z "$TOKEN" ]; then
+  echo "Usage: sudo bash deploy/vm-setup.sh \"<cloudflare-tunnel-token>\" [starter-password] [public-url]"
   exit 1
 fi
 
@@ -48,7 +50,11 @@ echo ">> Installing app dependencies ..."
 cd "$REPO_DIR"
 sudo -u "$RUN_USER" npm install --omit=dev
 echo ">> Writing config (.env) ..."
-sudo -u "$RUN_USER" node scripts/setup.mjs --public-url "$PUBLIC_URL" --password "$PW"
+if [ -n "$PW" ]; then
+  sudo -u "$RUN_USER" node scripts/setup.mjs --public-url "$PUBLIC_URL" --password "$PW"
+else
+  sudo -u "$RUN_USER" node scripts/setup.mjs --public-url "$PUBLIC_URL"
+fi
 
 # --- server service --------------------------------------------------------
 echo ">> Installing qrprint-server service ..."
@@ -85,10 +91,16 @@ curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/$CF"
 chmod +x /usr/local/bin/cloudflared
 cloudflared service install "$TOKEN"
 
+ADMIN_KEY="$(grep '^ADMIN_KEY=' "$REPO_DIR/.env" | cut -d= -f2)"
 echo ""
 echo "=================================================="
 echo "  Done. QRPrint is running on this VM."
-echo "  Local check:  curl -s http://localhost:3000/api/health"
-echo "  Live:         $PUBLIC_URL/p/"
-echo "  Now stop the server + tunnel on your PC."
+echo "  Live:        $PUBLIC_URL/p/"
+echo ""
+echo "  NEXT — create your shops:"
+echo "  1) Open  $PUBLIC_URL/admin/"
+echo "  2) Log in with ADMIN key:  $ADMIN_KEY"
+echo "  3) Add each shop -> it gives that shop's ID, password, and agent key."
+echo ""
+echo "  Then stop the server + tunnel on your PC."
 echo "=================================================="
