@@ -110,5 +110,7 @@ const mk = (windowMinutes, max, message) => rateLimit({
 });
 
 export const loginLimiter = mk(15, 10, 'Too many login attempts. Try again later.');
-export const uploadLimiter = mk(10, 40, 'Too many uploads. Please slow down.');
-export const payLimiter = mk(10, 30, 'Too many payment attempts. Please slow down.');
+// Per IP. Generous because a busy shop's customers often share one IP (shop
+// WiFi or mobile carrier NAT); still stops a single script from flooding us.
+export const uploadLimiter = mk(10, 120, 'Too many uploads. Please slow down.');
+export const payLimiter = mk(10, 90, 'Too many payment attempts. Please slow down.');

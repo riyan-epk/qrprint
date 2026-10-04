@@ -90,13 +90,17 @@
           <h2 class="h">How customers pay</h2>
           <label class="fld"><span>Payment method</span>
             <select id="payProvider">
-              <option value="cash">Cash at counter (you approve each job)</option>
+              <option value="cash">Cash at counter</option>
               <option value="jazzcash">JazzCash online (your merchant account)</option>
               <option value="safepay">Safepay online (coming soon)</option>
             </select>
           </label>
 
-          <div id="cashNote" class="hint">Customers upload &amp; you collect cash, then tap <b>Approve</b> on the job to print. No setup needed.</div>
+          <div id="cashFields">
+            <label class="check"><input type="checkbox" id="cashAuto"> Auto-approve (print without waiting for me)</label>
+            <div id="cashNoteManual" class="hint">Customers upload &amp; you collect cash, then tap <b>Approve</b> on the job to print. No setup needed.</div>
+            <div id="cashNoteAuto" class="hint hidden">Jobs print straight away — no Approve needed. Collect the cash when the customer picks up their pages (jobs show <b>cash due</b>).</div>
+          </div>
 
           <div id="jazzcashFields" class="hidden">
             <p class="hint">Your JazzCash <b>merchant API</b> credentials (from a JazzCash Business account). Payments go straight to you.</p>

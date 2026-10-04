@@ -27,7 +27,7 @@ agentRouter.get('/jobs/next', (req, res) => {
   if (!job) return res.json({ job: null });
 
   db.updateJob(job.id, {
-    print: { ...job.print, status: 'printing', attempts: job.print.attempts + 1, claimedAt: new Date().toISOString() },
+    print: { ...job.print, status: 'printing', attempts: job.print.attempts + 1, claimedAt: new Date().toISOString(), pingAt: null },
   });
   db.logEvent('job.claimed', { shopId: shop.id, jobId: job.id, attempt: job.print.attempts + 1 });
 
@@ -52,6 +52,16 @@ agentRouter.get('/jobs/:id/file', (req, res) => {
   fs.createReadStream(job.file.storedPath).pipe(res);
 });
 
+// Keep-alive while a job prints, so a big/slow job isn't mistaken for a stopped
+// agent and re-queued (which would print it twice). See recoverStalePrints.
+agentRouter.post('/jobs/:id/progress', (req, res) => {
+  const job = db.job(req.params.id);
+  if (!job || job.shopId !== req.shop.id) return res.status(404).json({ error: 'Job not found.' });
+  if (job.print.status !== 'printing') return res.json({ ok: false, status: job.print.status });
+  db.updateJob(job.id, { print: { ...job.print, pingAt: new Date().toISOString() } });
+  res.json({ ok: true });
+});
+
 // Report the outcome (refund-first policy).
 agentRouter.post('/jobs/:id/report', express.json(), async (req, res) => {
   const job = db.job(req.params.id);
@@ -60,9 +70,13 @@ agentRouter.post('/jobs/:id/report', express.json(), async (req, res) => {
   const { result, reason } = req.body || {};
 
   if (result === 'printed') {
-    db.updateJob(job.id, { print: { ...job.print, status: 'printed', error: null, printedAt: new Date().toISOString() } });
-    db.logEvent('job.printed', { shopId: job.shopId, jobId: job.id });
+    // Printed -> delete the customer's file right away (privacy).
     safeUnlink(job.file.storedPath);
+    db.updateJob(job.id, {
+      file: { ...job.file, storedPath: null },
+      print: { ...job.print, status: 'printed', error: null, printedAt: new Date().toISOString() },
+    });
+    db.logEvent('job.printed', { shopId: job.shopId, jobId: job.id });
     return res.json({ ok: true });
   }
 
@@ -77,7 +91,10 @@ agentRouter.post('/jobs/:id/report', express.json(), async (req, res) => {
 
     if (job.payment.status === 'paid') {
       const r = await refund(job);
+      // Refunded jobs can't be reprinted, so the file isn't needed any more.
+      safeUnlink(job.file.storedPath);
       db.updateJob(job.id, {
+        file: { ...job.file, storedPath: null },
         payment: { ...job.payment, status: 'refunded', refundRef: r.ref, refundedAt: r.at },
         print: { ...job.print, status: 'failed', error: reason || 'print_failed' },
       });

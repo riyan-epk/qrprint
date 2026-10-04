@@ -45,8 +45,35 @@ export function warmup() {
   } catch {}
 }
 
+// Each conversion starts a full LibreOffice (~200-300 MB RAM). Cap how many run
+// at once so a burst of Word uploads can't exhaust the server's memory; the rest
+// wait their turn. If the line gets too long, reject (code BUSY) rather than
+// keep the customer waiting past Cloudflare's 100 s request timeout.
+const MAX_PARALLEL = Math.max(1, Number(process.env.OFFICE_CONCURRENCY) || 2);
+const MAX_WAITING = 20;
+let running = 0;
+const waiting = [];
+
+function acquire() {
+  if (running < MAX_PARALLEL) { running++; return Promise.resolve(); }
+  if (waiting.length >= MAX_WAITING) {
+    return Promise.reject(Object.assign(new Error('Converter busy'), { code: 'BUSY' }));
+  }
+  return new Promise(resolve => waiting.push(resolve));
+}
+
+function release() {
+  const next = waiting.shift();
+  if (next) next(); else running--;
+}
+
 // Convert inputPath -> a PDF in outDir. Resolves to the produced PDF path.
-export function officeToPdf(inputPath, outDir) {
+export async function officeToPdf(inputPath, outDir) {
+  await acquire();
+  try { return await convert(inputPath, outDir); } finally { release(); }
+}
+
+function convert(inputPath, outDir) {
   return new Promise((resolve, reject) => {
     const soffice = findSoffice();
     // A unique user profile avoids "LibreOffice is already running" locks when

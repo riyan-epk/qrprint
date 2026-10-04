@@ -147,7 +147,12 @@ subscription → you** (enforced by this lock).
 - Paper-out / jam → job paused, shown on the dashboard, reprintable.
 - Options the printer can't do (color / duplex) → hidden from the customer.
 - Abandoned uploads and unpaid jobs → auto-deleted after 30 min.
-- Files deleted right after successful printing (privacy).
+- Files deleted right after successful printing or refund (privacy). Cash jobs
+  nobody approved → deleted after 2 h; files kept for Reprint → 24 h; job history
+  → 7 days. Tune with `APPROVAL_TTL_MIN`, `FILE_KEEP_HOURS`, `JOB_RETENTION_DAYS`.
+- Many customers at once: jobs queue per shop and print one by one, each exactly
+  once (the agent sends keep-alives so a long print is never re-queued and
+  printed twice). Word/Excel conversions run 2 at a time (`OFFICE_CONCURRENCY`).
 
 ## Production hardening (built in)
 

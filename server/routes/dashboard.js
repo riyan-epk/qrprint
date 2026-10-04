@@ -59,6 +59,7 @@ dashboardRouter.get('/jobs', (req, res) => {
     amount: j.price.amount,
     currency: j.price.currency,
     payment: j.payment.status,
+    payAtCounter: !!j.payment.auto,
     print: j.print.status,
     error: j.print.error,
     status: overallStatus(j),
@@ -111,7 +112,10 @@ dashboardRouter.post('/jobs/:id/refund', async (req, res) => {
   const job = ownJob(req, res); if (!job) return;
   if (job.payment.status !== 'paid') return res.status(409).json({ error: 'Only a paid job can be refunded.' });
   const r = await refund(job);
+  // Refunded jobs can't be reprinted, so the file isn't needed any more.
+  try { if (job.file.storedPath) fs.unlinkSync(job.file.storedPath); } catch {}
   db.updateJob(job.id, {
+    file: { ...job.file, storedPath: null },
     payment: { ...job.payment, status: 'refunded', refundRef: r.ref, refundedAt: r.at },
     print: { ...job.print, status: 'failed', error: 'refunded_by_shop' },
   });
@@ -172,6 +176,8 @@ dashboardRouter.post('/settings', (req, res) => {
     const s = (v, fallback, max = 128) => String(v ?? fallback ?? '').trim().slice(0, max);
     patch.payment_account = {
       provider,
+      // Cash only: print without waiting for the shopkeeper to tap Approve.
+      autoApprove: !!pa.autoApprove,
       display: provider === 'cash' ? 'Cash at counter'
         : (s(pa.display, '', 80) || (provider === 'jazzcash' ? 'JazzCash' : 'Safepay')),
       jazzcash: {

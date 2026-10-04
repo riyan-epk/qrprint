@@ -57,6 +57,7 @@ phoneRouter.get('/config', (req, res) => {
     subscription: { status: sub.status, message: sub.message },
     maxUploadMb: shop.capabilities.maxFileMb,
     paymentMode: shop.payment_account?.provider || 'cash',
+    cashAutoApprove: !!shop.payment_account?.autoApprove,
   });
 });
 
@@ -108,6 +109,9 @@ phoneRouter.post('/upload', uploadLimiter, (req, res) => {
       safeUnlink(uploaded); safeUnlink(finalPdf);
       if (e.code === 'NO_LIBREOFFICE') {
         return res.status(503).json({ error: 'Word/Office files are not set up on this shop yet. Please upload a PDF or image.' });
+      }
+      if (e.code === 'BUSY') {
+        return res.status(503).json({ error: 'Many customers are uploading right now. Please try again in a minute, or upload a PDF.' });
       }
       if (isPdf && String(e.message || '').toLowerCase().includes('encrypt')) {
         return res.status(422).json({ error: 'This PDF is password-protected. Please remove the password and try again.' });
@@ -180,6 +184,17 @@ phoneRouter.post('/jobs/:id/pay', payLimiter, async (req, res) => {
     return res.status(502).json({ error: 'Payment service error. Please try again.' });
   }
   if (!result.ok) return res.status(402).json({ error: result.error || 'Payment failed.' });
+
+  // Cash at counter with auto-approve on: print right away; the customer pays
+  // at the counter when they collect.
+  if (result.mode === 'cash' && shop.payment_account?.autoApprove) {
+    db.updateJob(job.id, {
+      payment: { ...job.payment, status: 'paid', provider: 'cash', auto: true, ref: 'CASH-' + job.id, paidAt: new Date().toISOString() },
+      print: { ...job.print, status: 'queued' },
+    });
+    db.logEvent('job.cash_auto_approved', { shopId: job.shopId, jobId: job.id, amount: job.price.amount });
+    return res.json(publicJob(db.job(job.id)));
+  }
 
   // Cash at counter: wait for the shopkeeper to collect payment and approve.
   if (result.mode === 'cash') {
@@ -317,7 +332,7 @@ function publicJob(job) {
     file: { originalName: job.file.originalName, pages: job.file.pages },
     options: job.options,
     price: job.price,
-    payment: { status: job.payment.status, ref: job.payment.ref },
+    payment: { status: job.payment.status, ref: job.payment.ref, payAtCounter: !!job.payment.auto },
     print: { status: job.print.status, error: job.print.error },
     status: overallStatus(job),
   };
@@ -353,13 +368,16 @@ async function imageToPdf(bytes, isPng) {
 // Recover jobs orphaned by an agent that stopped mid-print: if a job has been
 // 'printing' too long, re-queue it (or, after enough tries, flag for the shop).
 // This is what stops a crashed/closed agent from stranding paid jobs.
+// Agents that send keep-alives (/progress) are presumed dead after 2 minutes of
+// silence; older agents without keep-alive get 10 minutes, so a long print isn't
+// re-queued while it's still printing (which would print it twice).
 export function recoverStalePrints() {
-  const staleMs = 4 * 60 * 1000; // 4 minutes with no result = assume the agent died
   const now = Date.now();
   for (const job of db.jobs()) {
     if (job.print.status !== 'printing' || job.payment.status !== 'paid') continue;
-    const claimed = new Date(job.print.claimedAt || job.createdAt).getTime();
-    if (now - claimed <= staleMs) continue;
+    const last = new Date(job.print.pingAt || job.print.claimedAt || job.createdAt).getTime();
+    const staleMs = (job.print.pingAt ? 2 : 10) * 60 * 1000;
+    if (now - last <= staleMs) continue;
     if (job.print.attempts >= 3) {
       db.updateJob(job.id, { print: { ...job.print, status: 'needs_attention', error: 'no_response' } });
       db.logEvent('job.stale_giveup', { shopId: job.shopId, jobId: job.id });
@@ -370,16 +388,55 @@ export function recoverStalePrints() {
   }
 }
 
-export function cleanupPending() {
-  const ttl = config.unpaidJobTtlMinutes * 60 * 1000;
+// Auto-delete, for privacy and to keep the data file small:
+//   - abandoned uploads / unpaid jobs         after UNPAID_TTL_MIN     (30 min)
+//   - cash jobs nobody approved or cancelled  after APPROVAL_TTL_MIN   (2 h)
+//   - files kept for Reprint (stuck/failed)   after FILE_KEEP_HOURS    (24 h)
+//   - job records (dashboard history)         after JOB_RETENTION_DAYS (7 days)
+//   - stray files in uploads/ with no job     after 1 h (e.g. a restart mid-upload)
+// Printed and refunded files are already deleted the moment that happens.
+export function autoCleanup() {
   const now = Date.now();
+  const older = (iso, ms) => now - new Date(iso).getTime() > ms;
+  const unpaidMs = config.unpaidJobTtlMinutes * 60 * 1000;
+
   for (const [id, up] of pending) {
-    if (now - up.createdAt > ttl) { safeUnlink(up.path); pending.delete(id); }
+    if (now - up.createdAt > unpaidMs) { safeUnlink(up.path); pending.delete(id); }
   }
+
+  const remove = new Set();
+  let filesDropped = false;
   for (const job of db.jobs()) {
-    if (job.payment.status === 'unpaid' && now - new Date(job.createdAt).getTime() > ttl) {
+    const pay = job.payment.status;
+    const inFlight = pay === 'paid' && ['queued', 'printing'].includes(job.print.status);
+    if (pay === 'unpaid' && older(job.createdAt, unpaidMs)) {
+      remove.add(job.id);
+    } else if (pay === 'awaiting_approval' && older(job.createdAt, config.approvalTtlMinutes * 60 * 1000)) {
+      remove.add(job.id);
+      db.logEvent('job.approval_expired', { shopId: job.shopId, jobId: job.id });
+    } else if (!inFlight && pay !== 'awaiting_approval' && older(job.createdAt, config.jobRetentionDays * 864e5)) {
+      remove.add(job.id);
+    } else if (!inFlight && pay !== 'awaiting_approval' && job.file.storedPath
+               && older(job.createdAt, config.fileKeepHours * 3600 * 1000)) {
       safeUnlink(job.file.storedPath);
-      db.removeJob(job.id);
+      job.file.storedPath = null;
+      filesDropped = true;
     }
+  }
+  for (const job of db.jobs()) if (remove.has(job.id)) safeUnlink(job.file.storedPath);
+  const removed = remove.size ? db.removeJobsWhere(j => remove.has(j.id)) : 0;
+  if (filesDropped && !removed) db.save();
+
+  // Stray files: in uploads/ but not owned by any job or pending upload.
+  const known = new Set(db.jobs().map(j => j.file.storedPath).filter(Boolean));
+  for (const up of pending.values()) known.add(up.path);
+  let names = [];
+  try { names = fs.readdirSync(config.uploadsDir); } catch {}
+  for (const name of names) {
+    const p = path.join(config.uploadsDir, name);
+    if (known.has(p)) continue;
+    try {
+      if (now - fs.statSync(p).mtimeMs > 60 * 60 * 1000) fs.rmSync(p, { recursive: true, force: true });
+    } catch {}
   }
 }

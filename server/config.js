@@ -41,6 +41,11 @@ export const config = {
   // Limits / policy.
   maxUploadMb: Number(process.env.MAX_UPLOAD_MB || 25),
   unpaidJobTtlMinutes: Number(process.env.UNPAID_TTL_MIN || 30),
+  // Auto-delete (see autoCleanup in routes/phone.js). Printed files are deleted
+  // the moment they print; these cover everything else.
+  approvalTtlMinutes: Number(process.env.APPROVAL_TTL_MIN || 120),  // cash jobs nobody approved
+  fileKeepHours: Number(process.env.FILE_KEEP_HOURS || 24),         // stuck/failed files kept for Reprint
+  jobRetentionDays: Number(process.env.JOB_RETENTION_DAYS || 7),    // job history records
   graceDays: Number(process.env.GRACE_DAYS || 3),
 
   // Payment provider: 'mock' (offline, always succeeds) or 'jazzcash'.

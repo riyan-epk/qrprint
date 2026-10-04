@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import QRCode from 'qrcode';
 import { config, validateProd } from './config.js';
 import { load, db } from './db.js';
-import { phoneRouter, cleanupPending, recoverStalePrints, sweepSafepay } from './routes/phone.js';
+import { phoneRouter, autoCleanup, recoverStalePrints, sweepSafepay } from './routes/phone.js';
 import { agentRouter } from './routes/agent.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { adminRouter } from './routes/admin.js';
@@ -53,14 +53,28 @@ app.use(helmet({
 
 app.use(express.json({ limit: '256kb' })); // APIs that need it also set their own; this is a safety cap
 
-// Simple access log to a file (and console in dev).
+// Simple access log to a file (and console in dev). Routine polling (agents
+// asking for jobs, phones checking status) isn't logged, and the file rotates
+// at 10 MB keeping one old copy, so it can't fill the disk.
 fs.mkdirSync(config.logDir, { recursive: true });
-const accessLog = fs.createWriteStream(path.join(config.logDir, 'access.log'), { flags: 'a' });
+const ACCESS_LOG = path.join(config.logDir, 'access.log');
+const MAX_LOG_BYTES = 10 * 1024 * 1024;
+const QUIET = /^\/api\/agent\/(jobs\/next|heartbeat|jobs\/[^/]+\/progress)$|^\/api\/phone\/jobs\/[^/]+$/;
+let accessLog = fs.createWriteStream(ACCESS_LOG, { flags: 'a' });
+let logBytes = fs.existsSync(ACCESS_LOG) ? fs.statSync(ACCESS_LOG).size : 0;
 app.use((req, res, next) => {
   res.on('finish', () => {
+    if (QUIET.test(req.path) && res.statusCode < 400) return;
     const line = `${new Date().toISOString()} ${req.ip} ${req.method} ${req.originalUrl} ${res.statusCode}\n`;
     accessLog.write(line);
     if (!config.isProd) process.stdout.write('  ' + line);
+    logBytes += line.length;
+    if (logBytes > MAX_LOG_BYTES) {
+      accessLog.end();
+      try { fs.renameSync(ACCESS_LOG, ACCESS_LOG + '.1'); } catch {}
+      accessLog = fs.createWriteStream(ACCESS_LOG, { flags: 'a' });
+      logBytes = 0;
+    }
   });
   next();
 });
@@ -128,8 +142,9 @@ app.use((err, req, res, _next) => {
   res.status(err.status || 500).json({ error: config.isProd ? 'Server error.' : String(err.message || err) });
 });
 
-// Periodic cleanup of abandoned uploads / unpaid jobs.
-const cleanupTimer = setInterval(cleanupPending, 5 * 60 * 1000);
+// Auto-delete old files and job records (also once at startup).
+autoCleanup();
+const cleanupTimer = setInterval(autoCleanup, 5 * 60 * 1000);
 cleanupTimer.unref();
 
 // Recover jobs stranded by a stopped agent (re-queue stale 'printing' jobs).

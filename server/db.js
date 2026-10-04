@@ -28,6 +28,7 @@ function makeShop({ name, agentKey, slug, feeMonthly = 1500, passwordHash = null
     agentKey: agentKey || randomKey(),
     payment_account: {
       provider: 'cash',                 // 'cash' | 'jazzcash' | 'safepay'
+      autoApprove: false,               // cash: print without the Approve tap
       display: 'Cash at counter',
       jazzcash: { merchantId: '', password: '', integritySalt: '' },
       safepay: { environment: 'sandbox', apiKey: '', secretKey: '' },
@@ -143,6 +144,13 @@ export const db = {
   removeJob(id) {
     const i = state.jobs.findIndex(j => j.id === id);
     if (i >= 0) { state.jobs.splice(i, 1); persist(); }
+  },
+  // Remove many jobs with a single write (used by the auto-cleanup).
+  removeJobsWhere(pred) {
+    const before = state.jobs.length;
+    state.jobs = state.jobs.filter(j => !pred(j));
+    if (state.jobs.length !== before) persist();
+    return before - state.jobs.length;
   },
 
   // --- events ---

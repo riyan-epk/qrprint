@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import sys
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -97,7 +98,27 @@ def download(cfg, path, dest):
         shutil.copyfileobj(resp, f)
 
 
+def keepalive(cfg, job_id, stop):
+    """Tell the server we're still working on this job, so a long print isn't
+    mistaken for a stopped agent and re-queued (which would print it twice)."""
+    while not stop.is_set():
+        try:
+            api(cfg, "POST", f"/api/agent/jobs/{job_id}/progress", {})
+        except Exception:
+            pass
+        stop.wait(20)
+
+
 def process_job(cfg, job):
+    stop = threading.Event()
+    threading.Thread(target=keepalive, args=(cfg, job["id"], stop), daemon=True).start()
+    try:
+        run_job(cfg, job)
+    finally:
+        stop.set()
+
+
+def run_job(cfg, job):
     print(f"-> job {job['id']}: {job['originalName']} ({job['pages']}p) {job['options']}")
     workdir = os.path.join(HERE, ".work", job["id"])
     os.makedirs(workdir, exist_ok=True)
@@ -129,11 +150,24 @@ def process_job(cfg, job):
 
 
 def report(cfg, job_id, result, reason=None, detail=None):
-    try:
-        api(cfg, "POST", f"/api/agent/jobs/{job_id}/report",
-            {"result": result, "reason": reason, "detail": detail})
-    except Exception as e:
-        print(f"   ! could not report result: {e}")
+    # Retry: if the server never hears "printed", it re-queues the job and it
+    # would print a second time.
+    tries = 5
+    for attempt in range(1, tries + 1):
+        try:
+            api(cfg, "POST", f"/api/agent/jobs/{job_id}/report",
+                {"result": result, "reason": reason, "detail": detail})
+            return
+        except urllib.error.HTTPError as e:
+            if e.code < 500:  # job gone / bad key: retrying won't help
+                print(f"   ! could not report result: {e}")
+                return
+            err = e
+        except Exception as e:
+            err = e
+        print(f"   ! could not report result (try {attempt}/{tries}): {err}")
+        if attempt < tries:
+            time.sleep(3 * attempt)
 
 
 def heartbeat(cfg):

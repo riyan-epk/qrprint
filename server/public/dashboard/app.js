@@ -82,7 +82,7 @@ function renderJobs(jobs) {
       <td>${time(j.createdAt)}</td>
       <td>${esc(j.file.originalName)}<br><small style="color:var(--muted)">${j.file.pages}p</small></td>
       <td><small>${esc(opt)}</small></td>
-      <td>${j.amount} ${j.currency}</td>
+      <td>${j.amount} ${j.currency}${j.payAtCounter && j.payment === 'paid' ? '<br><small style="color:var(--warn)">cash due</small>' : ''}</td>
       <td><span class="badge b-${j.status}">${label(j.status)}</span></td>
       <td>${actions}</td>
     </tr>`;
@@ -141,6 +141,7 @@ async function loadSettings() {
   $('prColor').value = s.pricing.colorPerPage;
   const pa = s.payment_account || {};
   $('payProvider').value = pa.provider || 'cash';
+  $('cashAuto').checked = !!pa.autoApprove;
   $('jcMerchant').value = pa.jazzcash?.merchantId || '';
   $('jcPassword').value = pa.jazzcash?.password || '';
   $('jcSalt').value = pa.jazzcash?.integritySalt || '';
@@ -152,11 +153,14 @@ async function loadSettings() {
 
 function togglePayFields() {
   const p = $('payProvider').value;
-  $('cashNote').classList.toggle('hidden', p !== 'cash');
+  $('cashFields').classList.toggle('hidden', p !== 'cash');
+  $('cashNoteManual').classList.toggle('hidden', $('cashAuto').checked);
+  $('cashNoteAuto').classList.toggle('hidden', !$('cashAuto').checked);
   $('jazzcashFields').classList.toggle('hidden', p !== 'jazzcash');
   $('safepayFields').classList.toggle('hidden', p !== 'safepay');
 }
 $('payProvider').addEventListener('change', togglePayFields);
+$('cashAuto').addEventListener('change', togglePayFields);
 
 $('saveSettings').addEventListener('click', async () => {
   const payload = {
@@ -171,6 +175,7 @@ $('saveSettings').addEventListener('click', async () => {
     pricing: { bwPerPage: +$('prBw').value, colorPerPage: +$('prColor').value },
     payment_account: {
       provider: $('payProvider').value,
+      autoApprove: $('cashAuto').checked,
       jazzcash: { merchantId: $('jcMerchant').value, password: $('jcPassword').value, integritySalt: $('jcSalt').value },
       safepay: { environment: $('spEnv').value, apiKey: $('spKey').value, secretKey: $('spSecret').value },
     },

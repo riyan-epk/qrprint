@@ -56,7 +56,9 @@ Open **`https://print.mystay.live/dashboard/`**, log in with your **Shop ID +
 password**. There you can:
 - watch jobs and today's earnings,
 - set your **prices** and what your printer can do (colour / double-sided),
-- connect your **payout account**,
+- choose how customers pay. With **Cash at counter**, tick **Auto-approve** if you
+  don't want to tap *Approve* for every job: jobs print straight away and show
+  **cash due** — collect the money when the customer picks up,
 - **change your password** (Settings → Change password),
 - print your **QR** (QR code tab).
 

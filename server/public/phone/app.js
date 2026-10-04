@@ -45,7 +45,8 @@ async function init() {
     $('lockedMsg').textContent = CONFIG.subscription.message || 'This shop is temporarily unavailable.';
     return;
   }
-  PAY_LABEL = CONFIG.paymentMode === 'cash' ? 'Send to shop' : 'Pay & Print';
+  PAY_LABEL = CONFIG.paymentMode !== 'cash' ? 'Pay & Print'
+    : CONFIG.cashAutoApprove ? 'Print now' : 'Send to shop';
   $('payBtn').textContent = PAY_LABEL;
   wire();
   maybeResume();
@@ -252,7 +253,12 @@ function renderStatus(j) {
     failed: ['❌', 'Could not print', 'Sorry — please ask the shopkeeper.'],
     refunded: ['💸', 'Refunded', 'The print failed, so your payment was refunded.'],
   };
-  const [icon, title, msg] = map[j.status] || ['⏳', 'Working…', ''];
+  let [icon, title, msg] = map[j.status] || ['⏳', 'Working…', ''];
+  // Auto-approved cash job: it prints first, the customer pays on pickup.
+  if (j.payment.payAtCounter) {
+    if (['queued', 'printing', 'done'].includes(j.status)) msg += ` Please pay ${j.price.amount} ${j.price.currency} at the counter.`;
+    else if (j.status === 'refunded') msg = 'The print failed, so there is nothing to pay.';
+  }
   $('stIcon').textContent = icon;
   $('stTitle').textContent = title;
   $('stMsg').textContent = msg;
