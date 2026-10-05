@@ -1,0 +1,58 @@
+/* Provider console. Builds on /shared/ui.css + /shared/app.css. */
+.add-card{margin-bottom:20px}
+.add-grid{display:grid; grid-template-columns:1.4fr 1.2fr .8fr; gap:0 16px}
+.add-actions{display:flex; align-items:center; justify-content:flex-end; gap:10px}
+.add-actions .form-error{margin:0 auto 0 0}
+.input-suffix{display:flex; align-items:stretch}
+.input-suffix .input{border-top-right-radius:0; border-bottom-right-radius:0; min-width:0}
+.input-suffix > span{display:flex; align-items:center; padding:0 12px; border:1px solid var(--line-strong); border-left:none;
+  border-radius:0 var(--radius) var(--radius) 0; background:var(--surface-2); color:var(--muted); font-size:13px}
+
+.creds{margin-top:18px; padding:16px; border:1px solid var(--good-line); background:var(--good-soft); border-radius:var(--radius)}
+.creds h3{display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--good); margin-bottom:12px}
+
+/* key/value rows with copy buttons */
+.kv{display:grid; grid-template-columns:180px 1fr auto; gap:8px 12px; align-items:center; font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0; min-width:0}
+.kv code{display:block; font-family:var(--mono); font-size:12.5px; color:var(--ink); background:var(--surface); border:1px solid var(--line);
+  border-radius:6px; padding:5px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+/* shop list */
+.shop{padding:18px 20px; border-bottom:1px solid var(--line)}
+.shop:last-child{border-bottom:none}
+.shop-top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap}
+.shop-title{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.shop-title b{font-size:15px; font-weight:600}
+.shop-meta{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:6px; font-size:13px; color:var(--muted)}
+.shop-meta span{display:inline-flex; align-items:center; gap:6px}
+.shop-meta .icon{width:14px; height:14px}
+.agent-dot{width:8px; height:8px; border-radius:50%; background:var(--line-strong)}
+.agent-dot.on{background:#17B26A}
+.warn-txt{color:var(--warn); font-weight:500}
+.shop-actions{display:flex; gap:8px; flex-wrap:wrap}
+.shop-detail{margin-top:14px; padding:14px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface-2)}
+
+.empty{text-align:center; padding:40px 20px; color:var(--muted)}
+.empty .spinner{margin:0 auto}
+
+.activity-card{margin-top:20px}
+.events{list-style:none; margin:0; padding:4px 20px 12px; max-height:360px; overflow:auto}
+.events li{display:grid; grid-template-columns:150px 1fr; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font-size:13px}
+.events li:last-child{border-bottom:none}
+.events time{color:var(--muted); font-variant-numeric:tabular-nums}
+.events .ev-shop{color:var(--muted)}
+
+@media (max-width:860px){
+  .add-grid{grid-template-columns:1fr}
+  .kv{grid-template-columns:1fr auto}
+  .kv dt{grid-column:1 / -1; margin-top:4px}
+}
+@media (max-width:600px){
+  .shop{padding:16px}
+  .events{padding:4px 16px 12px}
+  .events li{grid-template-columns:1fr; gap:2px}
+}
+.shop-detail .shop-actions{margin-top:12px}
+.pc-line{display:flex; align-items:center; gap:6px; margin-top:12px; font-size:13px; color:var(--ink-2)}
+.pc-line .icon{width:14px; height:14px; color:var(--muted)}

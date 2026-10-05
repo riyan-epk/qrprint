@@ -14,6 +14,7 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { adminRouter } from './routes/admin.js';
 import { authRouter } from './routes/auth.js';
 import { warmup as warmupOffice } from './office.js';
+import { shopFromSession, isAdminSession } from './security.js';
 
 validateProd();   // refuse to boot with insecure defaults in production
 load();           // read or seed the database
@@ -22,15 +23,13 @@ const app = express();
 app.disable('x-powered-by');
 if (config.trustProxy) app.set('trust proxy', 1); // correct client IP + secure cookies behind Caddy/Nginx
 
-// Security headers. CSP is tight: scripts/styles from self only (styles allow
-// inline because a couple of pages use small <style> blocks). No inline JS.
-// The payment provider's origin is allowed as a form target so the hosted
-// checkout redirect works.
-const formActions = ["'self'"];
+// Security headers. CSP is tight: scripts from self only (no inline JS);
+// styles from self + Google Fonts (inline allowed for small style attributes).
+// JazzCash's hosted checkout is a form POST, so its origins are allowed as form
+// targets (Safepay is a plain redirect and needs nothing here).
+const formActions = ["'self'", 'https://sandbox.jazzcash.com.pk', 'https://payments.jazzcash.com.pk'];
 try {
-  if (config.paymentProvider === 'jazzcash' && config.jazzcash.baseUrl) {
-    formActions.push(new URL(config.jazzcash.baseUrl).origin);
-  }
+  if (config.jazzcash.baseUrl) formActions.push(new URL(config.jazzcash.baseUrl).origin);
 } catch {}
 
 app.use(helmet({
@@ -38,13 +37,15 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'blob:'],      // blob: = photo previews on the phone
+      workerSrc: ["'self'"],                       // pdf.js page previews
       connectSrc: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       frameAncestors: ["'none'"],
-      formAction: formActions,
+      formAction: [...new Set(formActions)],
       upgradeInsecureRequests: config.isProd ? [] : null,
     },
   },
@@ -86,7 +87,49 @@ const staticOpts = {
   setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
 };
 const pub = path.join(config.root, 'server', 'public');
+
+// HTML pages served by the server (not express.static) get {{VARS}} filled in,
+// so contact details are configured once (CONTACT_EMAIL / CONTACT_WHATSAPP).
+const escHtml = (v) => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function sendPage(res, file, next) {
+  fs.readFile(path.isAbsolute(file) ? file : path.join(pub, file), 'utf8', (err, html) => {
+    if (err) return next ? next(err) : res.status(500).end();
+    const vars = {
+      CONTACT_EMAIL: config.contact.email,
+      CONTACT_WHATSAPP: config.contact.whatsapp,
+      WHATSAPP_LINK: 'https://wa.me/' + config.contact.whatsapp.replace(/\D/g, ''),
+      YEAR: new Date().getFullYear(),
+    };
+    res.setHeader('Cache-Control', 'no-cache');
+    res.type('html').send(html.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? escHtml(vars[k]) : m)));
+  });
+}
+
+// Protected pages are decided on the server: a logged-out visitor gets the
+// login page straight away (never a flash of the dashboard first), and a
+// logged-in one skips the login page.
+app.get(['/dashboard/', '/dashboard/index.html'], (req, res) => {
+  if (!shopFromSession(req)) return res.redirect(302, '/dashboard/login');
+  sendPage(res, 'dashboard/index.html');
+});
+app.get(['/dashboard/login', '/dashboard/login.html'], (req, res) => {
+  if (shopFromSession(req)) return res.redirect(302, '/dashboard/');
+  sendPage(res, 'dashboard/login.html');
+});
+app.get(['/admin/', '/admin/index.html'], (req, res) => {
+  if (!isAdminSession(req)) return res.redirect(302, '/admin/login');
+  sendPage(res, 'admin/index.html');
+});
+app.get(['/admin/login', '/admin/login.html'], (req, res) => {
+  if (isAdminSession(req)) return res.redirect(302, '/admin/');
+  sendPage(res, 'admin/login.html');
+});
+
 app.use('/shared', express.static(path.join(pub, 'shared'), staticOpts));
+app.use('/site', express.static(path.join(pub, 'site'), staticOpts));
+// Third-party browser files in versioned folders (e.g. /vendor/pdfjs-6.4.299/),
+// so they can be cached for a long time.
+app.use('/vendor', express.static(path.join(pub, 'vendor'), { immutable: true, maxAge: '365d' }));
 app.use('/p', express.static(path.join(pub, 'phone'), staticOpts));
 app.use('/dashboard', express.static(path.join(pub, 'dashboard'), staticOpts));
 app.use('/admin', express.static(path.join(pub, 'admin'), staticOpts));
@@ -121,17 +164,8 @@ app.get('/api/qr', async (req, res) => {
 });
 app.get('/api/qr/target', (req, res) => res.json({ url: phoneUrl(qrSlug(req)) }));
 
-app.get('/', (_req, res) => {
-  res.type('html').send(`<!doctype html><meta charset="utf8"><title>QRPrint</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <style>body{font-family:system-ui;max-width:640px;margin:60px auto;padding:0 20px;line-height:1.7}
-    a{display:block;margin:8px 0;font-size:1.1rem}code{background:#eee;padding:2px 6px;border-radius:4px}</style>
-    <h1>🖨️ QRPrint (${config.env})</h1>
-    <a href="/p/">📱 Phone page (what the QR opens)</a>
-    <a href="/dashboard/">🧾 Shop dashboard</a>
-    <a href="/admin/">🔒 Provider admin</a>
-    <p style="color:#666">QR target: <code>${phoneUrl()}</code></p>`);
-});
+// Public homepage.
+app.get('/', (_req, res, next) => sendPage(res, path.join(config.root, 'server', 'views', 'home.html'), next));
 
 // 404 + error handler (never leak stack traces in production).
 app.use((req, res) => res.status(404).json({ error: 'Not found.' }));

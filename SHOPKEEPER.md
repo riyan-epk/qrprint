@@ -6,42 +6,35 @@ Your provider created your shop and gave you:
 - Your **customer QR link** — `https://print.mystay.live/p/?s=<your-shop-id>`.
 
 You only need to set up the small **print agent** on the PC connected to your
-printer. About 5 minutes.
+printer. About 2 minutes, nothing to install.
 
 ---
 
 ## Step 1 — Get the agent folder
-Your provider will send you a folder called **`agent`** (by USB or WhatsApp/email).
-Put it somewhere easy, e.g. `C:\qrprint-agent`.
+Your provider sends you **`qrprint-agent-windows.zip`**. Right-click it →
+**Extract All**, and put the **`QRPrint-Agent`** folder somewhere permanent,
+e.g. `C:\QRPrint` (not Downloads, not a USB stick). It contains
+`qrprint-agent.exe`, `SumatraPDF.exe` and `README-FIRST.txt`.
 
-## Step 2 — Run the setup (installs everything)
-Open the `agent` folder and **double-click `setup-agent.bat`**.
+## Step 2 — Make your printer the default
+Turn the printer on. In Windows: **Settings → Bluetooth & devices → Printers &
+scanners →** your printer **→ Set as default**.
 
-It automatically installs:
-- **Python** (if missing — if it installs Python, just run `setup-agent.bat` again),
-- **SumatraPDF** (used to print),
-- the small Python packages the agent needs.
+## Step 3 — Run the agent and paste your key
+Double-click **`qrprint-agent.exe`**. (If Windows says *"Windows protected your
+PC"*, click **More info → Run anyway**.) Paste your **agent key** and press
+Enter — it checks the key and shows your shop's name. When it asks
+*"Start automatically when this PC turns on?"*, press Enter for **Yes**.
 
-If Windows asks for permission during the winget installs, click **Yes**.
+## Step 4 — Leave it running
+The window says *"Waiting for paid jobs."* That's your printer live. Minimise
+it, but don't close it. To print a test page, run `qrprint-agent.exe --test`.
 
-## Step 3 — Paste your agent key
-In the `agent` folder, right-click **`config.json` → Edit**. Set your agent key:
-```json
-{
-  "server_url": "https://print.mystay.live",
-  "agent_key": "PASTE-YOUR-AGENT-KEY-HERE",
-  "print_mode": "live"
-}
-```
-Save the file.
-
-## Step 4 — Start printing
-Double-click **`run-agent.bat`**. A window opens and says *"Waiting for paid
-jobs."* Leave it open — that's the printer program running.
-
-> Tip: put a shortcut to `run-agent.bat` in your Startup folder
-> (press `Win+R`, type `shell:startup`, drag a shortcut there) so it starts
-> automatically whenever the PC turns on.
+> Your agent key works on **one** computer. If you move the agent to a new PC,
+> ask your provider to **Unlink PC** first.
+>
+> On Linux / Raspberry Pi, or to run from source, see the `agent/` folder
+> (`setup-agent.bat` / `python agent.py`).
 
 ## Step 5 — Test a real print
 1. Make sure your printer is on and set as the **default printer** in Windows.

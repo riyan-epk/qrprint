@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Provider console · QRPrint</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/shared/ui.css">
+</head>
+<body>
+  <main class="auth">
+    <a class="brand" href="/"><span class="brand-mark"><i data-icon="printer"></i></span><span>QR<b>Print</b></span></a>
+    <form class="card auth-card" id="loginForm" novalidate>
+      <h1>Provider console</h1>
+      <p class="lead">Manage shops, subscriptions and print agents.</p>
+      <label class="field"><span>Admin key</span>
+        <input class="input mono" id="key" type="password" autocomplete="current-password" required>
+        <span class="hint">The ADMIN_KEY from the server's .env file.</span>
+      </label>
+      <button class="btn btn-primary btn-lg btn-block" id="loginBtn" type="submit">Sign in</button>
+      <p class="form-error hidden" id="loginErr" role="alert"></p>
+    </form>
+  </main>
+  <script src="/shared/ui.js"></script>
+  <script src="/admin/login.js"></script>
+</body>
+</html>

@@ -15,3 +15,10 @@ agent/build_tmp/
 
 # packaged build zips
 *.zip
+
+# agent build (python agent/build_windows.py)
+agent/build/
+agent/release/
+agent/vendor/
+agent/agent.log*
+agent/.work/

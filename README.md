@@ -33,7 +33,8 @@ printing/
 │   ├── db.js          local JSON data store (swap for Postgres later)
 │   ├── pricing.js     price + page-range logic
 │   ├── subscription.js the remote lock (active / grace / suspended)
-│   ├── payments.js    mock + JazzCash stub (pluggable)
+│   ├── payments.js    cash / Safepay / JazzCash (per shop)
+│   ├── layout.js      CNIC + passport sheets, multi-file merge
 │   ├── routes/        phone, agent, dashboard, admin APIs
 │   └── public/        phone / dashboard / admin web pages
 └── agent/             Python print agent (runs next to the printer)
@@ -91,12 +92,30 @@ Edit `agent/config.json`:
 - **Linux / Raspberry Pi:** make sure CUPS is set up (`lp` works), optionally set
   `"printer_name"` to your CUPS queue.
 
-## Turn on real payments
+## Payments
 
-Set `PAYMENT_PROVIDER=jazzcash` and implement the two TODOs in
-`server/payments.js` with your (or the shop's) JazzCash credentials. Until then,
-keep `mock` for testing. The shop connects its payout account under
-**Dashboard → Settings → Your payout account**.
+Each shop picks its method under **Dashboard → Settings → Payments**:
+
+- **Cash at counter** — the shopkeeper approves each job (or turns on auto-approve).
+- **Safepay online** — the shop enters its own Safepay API key + secret; money
+  goes to the shop's Safepay account. Use *Sandbox* to test, then *Production*.
+- **JazzCash** — shown as *Coming soon* until it's finished and switched on with
+  `JAZZCASH_ENABLED=1`. See **[JAZZCASH.md](JAZZCASH.md)** for what's left.
+
+## What customers can print
+
+- **Documents & pictures** — up to 20 files in one order (PDF, Word, Excel,
+  PowerPoint, OpenDocument, RTF, text, photos). Before paying they can preview
+  pages, skip pages, rotate pages and reorder files. With double-sided printing
+  each file starts on a new sheet (the blank back page isn't charged).
+- **ID card copy (CNIC)** — photo of the front and back, lined up with a card
+  frame on the phone, printed together on one page at true card size (85.6 × 54 mm).
+- **Passport photos** — 4 to 20 photos of 35 × 45 mm on one sheet, with cut lines.
+
+ID card and passport sheets are sent to the agent with `scale: actual`, so they
+print at real size. **Update the print agent at each shop** (`agent/printer.py`)
+to get this — an older agent still prints them, but shrunk slightly to fit the
+printer's margins.
 
 ---
 

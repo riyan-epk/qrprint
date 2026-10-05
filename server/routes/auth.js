@@ -2,50 +2,58 @@
 import express from 'express';
 import { config } from '../config.js';
 import { db } from '../db.js';
-import { verifyPassword, setSession, clearSession, loginLimiter } from '../security.js';
+import {
+  verifyPassword, safeEqual, setShopSession, setAdminSession, clearSession, loginLimiter,
+} from '../security.js';
 
 export const authRouter = express.Router();
 authRouter.use(express.json());
 
-// The dashboard always shows a login (that's how we know which shop it is).
-authRouter.get('/me', (_req, res) => {
-  res.json({ multiTenant: true, dashboardAuthRequired: true });
-});
-
 // Shop login: Shop ID (slug) + password -> signed cookie carrying the shop id.
+// The same message for an unknown ID and a wrong password, so the login form
+// can't be used to discover which Shop IDs exist.
+const BAD_LOGIN = 'Wrong Shop ID or password.';
+
 authRouter.post('/shop/login', loginLimiter, (req, res) => {
-  const slug = String(req.body?.shopId || '').trim();
+  const slug = String(req.body?.shopId || '').trim().toLowerCase();
   const shop = db.shopBySlug(slug);
-  if (!shop) return res.status(401).json({ error: 'Unknown Shop ID.' });
+  if (!shop) return res.status(401).json({ error: BAD_LOGIN });
 
   const hash = shop.auth?.passwordHash;
   if (!hash) {
     // No password configured yet. Allowed only off-production (fresh dev shop).
     if (config.isProd) {
-      return res.status(403).json({ error: 'This shop has no password set. Ask the provider to set one.' });
+      return res.status(403).json({ error: 'This shop has no password yet. Ask your provider to set one.' });
     }
-    setSession(res, { role: 'shop', shopId: shop.id });
+    setShopSession(res, shop);
     return res.json({ ok: true, shop: { name: shop.name, slug: shop.slug }, note: 'No password set (development).' });
   }
 
   if (!verifyPassword(req.body?.password || '', hash)) {
-    return res.status(401).json({ error: 'Wrong password.' });
+    db.logEvent('auth.shop_login_failed', { shopId: shop.id });
+    return res.status(401).json({ error: BAD_LOGIN });
   }
-  setSession(res, { role: 'shop', shopId: shop.id });
+  setShopSession(res, shop);
   db.logEvent('auth.shop_login', { shopId: shop.id });
   res.json({ ok: true, shop: { name: shop.name, slug: shop.slug } });
 });
 
-// Admin (provider) login: admin key -> cookie.
-authRouter.post('/admin/login', loginLimiter, (req, res) => {
-  if ((req.body?.key || '') !== config.adminKey) {
-    return res.status(401).json({ error: 'Wrong admin key.' });
-  }
-  setSession(res, { role: 'admin' });
+authRouter.post('/logout', (_req, res) => {
+  clearSession(res, 'shop');
   res.json({ ok: true });
 });
 
-authRouter.post('/logout', (_req, res) => {
-  clearSession(res);
+// Admin (provider) login: admin key -> cookie.
+authRouter.post('/admin/login', loginLimiter, (req, res) => {
+  if (!safeEqual(req.body?.key || '', config.adminKey)) {
+    return res.status(401).json({ error: 'Wrong admin key.' });
+  }
+  setAdminSession(res);
+  db.logEvent('auth.admin_login', {});
+  res.json({ ok: true });
+});
+
+authRouter.post('/admin/logout', (_req, res) => {
+  clearSession(res, 'admin');
   res.json({ ok: true });
 });

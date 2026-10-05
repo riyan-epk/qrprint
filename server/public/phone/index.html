@@ -2,107 +2,205 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <title>Print a document</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Print a document · QRPrint</title>
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/shared/ui.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/p/style.css">
 </head>
 <body>
-  <main class="card">
-    <header class="top">
-      <div class="logo">🖨️</div>
-      <div>
-        <h1 id="shopName">Print Shop</h1>
-        <p class="sub" id="shopSub">Scan · Upload · Pay · Print</p>
+  <main class="sheet" id="sheet">
+    <header class="shop-head">
+      <span class="shop-logo"><i data-icon="printer"></i></span>
+      <div class="shop-txt">
+        <h1 id="shopName">Print shop</h1>
+        <p>Self-service printing</p>
       </div>
     </header>
 
+    <ol class="steps" id="steps" aria-label="Progress">
+      <li class="on">Choose</li><li>Options</li><li>Pay</li><li>Collect</li>
+    </ol>
+
     <!-- Suspended notice -->
-    <section id="lockedView" class="hidden banner banner-crit">
-      <strong>Service paused</strong>
-      <p id="lockedMsg">This shop is temporarily unavailable. Please try again later.</p>
+    <section id="lockedView" class="view hidden">
+      <div class="alert alert-crit"><i data-icon="pause"></i>
+        <div><strong>Service paused</strong><p id="lockedMsg">This shop is temporarily unavailable. Please try again later.</p></div>
+      </div>
     </section>
 
-    <!-- Step 1: choose file -->
-    <section id="uploadView">
-      <label class="dropzone" id="dropzone">
-        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.rtf,.txt,application/pdf,image/jpeg,image/png" hidden>
-        <div class="dz-inner">
-          <div class="dz-icon">📄</div>
-          <div class="dz-title">Tap to choose a file</div>
-          <div class="dz-hint" id="dzHint">PDF, Word, Excel, PowerPoint or image · up to <span id="maxMb">25</span> MB</div>
-        </div>
-      </label>
-      <p class="err hidden" id="uploadErr"></p>
-      <div class="uploading hidden" id="uploadingRow"><span class="spinner"></span> Reading your file…</div>
+    <!-- Step 1: what to print -->
+    <section id="startView" class="view">
+      <h2 class="view-title">What would you like to print?</h2>
+      <div class="services">
+        <button class="service" id="svcDocs" type="button">
+          <span class="service-ic"><i data-icon="files"></i></span>
+          <span class="service-txt"><b>Documents &amp; pictures</b><small>PDF, Word, Excel, PowerPoint or photos — choose one or many</small></span>
+          <i data-icon="chevRight" class="service-go"></i>
+        </button>
+        <button class="service" id="svcId" type="button">
+          <span class="service-ic"><i data-icon="idcard"></i></span>
+          <span class="service-txt"><b>ID card copy (CNIC)</b><small>Front and back on one page, at actual card size</small></span>
+          <i data-icon="chevRight" class="service-go"></i>
+        </button>
+        <button class="service" id="svcPhoto" type="button">
+          <span class="service-ic"><i data-icon="portrait"></i></span>
+          <span class="service-txt"><b>Passport photos</b><small>35 × 45 mm photos on one sheet, ready to cut</small></span>
+          <i data-icon="chevRight" class="service-go"></i>
+        </button>
+      </div>
+      <p class="drop-hint">Up to <span id="maxMb">25</span>&nbsp;MB per file · you can also drag files onto this page</p>
+      <p class="form-error hidden" id="startErr" role="alert"></p>
     </section>
 
-    <!-- Step 2: options + price -->
-    <section id="optionsView" class="hidden">
-      <div class="filechip">
-        <span class="fc-name" id="fcName">file.pdf</span>
-        <span class="fc-meta" id="fcMeta">0 pages</span>
-        <button class="fc-change" id="changeFile">Change</button>
+    <!-- Step 2: files / photos + options + price -->
+    <section id="optionsView" class="view hidden">
+      <button class="back-link" id="backToStart" type="button"><i data-icon="arrowLeft"></i> Back</button>
+
+      <!-- Documents -->
+      <div id="docsPanel" class="panel">
+        <div class="panel-head"><h2>Your files</h2><span class="muted" id="docsCount"></span></div>
+        <ul class="files" id="fileList"></ul>
+        <button class="btn btn-block add-more" id="addMore" type="button"><i data-icon="plus"></i> Add more files</button>
       </div>
 
-      <div class="opt">
-        <label>Copies</label>
-        <div class="stepper">
-          <button id="copMinus" type="button">−</button>
-          <input id="copies" type="number" value="1" min="1" max="999" inputmode="numeric">
-          <button id="copPlus" type="button">+</button>
+      <!-- ID card -->
+      <div id="idPanel" class="panel hidden">
+        <div class="panel-head"><h2>ID card copy</h2></div>
+        <p class="hint">Place the card on a flat, dark surface and take the photo from straight above. You'll line it up with the card frame next.</p>
+        <div class="slots">
+          <div class="slot slot-card" id="slot-front"></div>
+          <div class="slot slot-card" id="slot-back"></div>
         </div>
       </div>
 
-      <div class="opt" id="colorOpt">
-        <label>Color</label>
-        <div class="segmented" data-name="color">
-          <button class="active" data-val="false" type="button">Black &amp; White</button>
-          <button data-val="true" type="button">Color</button>
+      <!-- Passport photos -->
+      <div id="photoPanel" class="panel hidden">
+        <div class="panel-head"><h2>Passport photos</h2></div>
+        <p class="hint">Use a recent photo with a plain, light background and your face in the centre.</p>
+        <div class="photo-row">
+          <div class="slot slot-photo" id="slot-photo"></div>
+          <div class="opt">
+            <span class="opt-label">Photos on the sheet</span>
+            <div class="segmented compact" data-name="photoCount">
+              <button data-val="4" type="button">4</button>
+              <button class="active" data-val="8" type="button">8</button>
+              <button data-val="12" type="button">12</button>
+              <button data-val="16" type="button">16</button>
+              <button data-val="20" type="button">20</button>
+            </div>
+            <p class="hint">Each photo is 35 × 45 mm with cutting lines.</p>
+          </div>
         </div>
       </div>
 
-      <div class="opt" id="duplexOpt">
-        <label>Sides</label>
-        <div class="segmented" data-name="duplex">
-          <button class="active" data-val="single" type="button">Single</button>
-          <button data-val="double" type="button">Double</button>
-          <button data-val="mixed" type="button">1st single, rest double</button>
+      <div class="opts">
+        <div class="opt">
+          <span class="opt-label" id="copiesLabel">Copies</span>
+          <div class="stepper">
+            <button id="copMinus" type="button" aria-label="Fewer"><i data-icon="minus"></i></button>
+            <input id="copies" type="number" value="1" min="1" max="999" inputmode="numeric" aria-labelledby="copiesLabel">
+            <button id="copPlus" type="button" aria-label="More"><i data-icon="plus"></i></button>
+          </div>
         </div>
-      </div>
 
-      <div class="opt hidden" id="paperOpt">
-        <label>Paper size</label>
-        <div class="segmented" data-name="paperSize" id="paperSeg"></div>
-      </div>
+        <div class="opt" id="colorOpt">
+          <span class="opt-label">Colour</span>
+          <div class="segmented" data-name="color">
+            <button class="active" data-val="false" type="button">Black &amp; white</button>
+            <button data-val="true" type="button">Colour</button>
+          </div>
+        </div>
 
-      <div class="opt">
-        <label>Pages <span class="muted">(blank = all)</span></label>
-        <input id="pageRange" class="text" type="text" placeholder="e.g. 1-3, 5, 8-10" inputmode="text">
+        <div class="opt" id="duplexOpt">
+          <span class="opt-label">Sides</span>
+          <div class="segmented" data-name="duplex">
+            <button class="active" data-val="single" type="button">Single</button>
+            <button data-val="double" type="button">Double</button>
+            <button data-val="mixed" type="button">1st single, rest double</button>
+          </div>
+        </div>
+
+        <div class="opt hidden" id="paperOpt">
+          <span class="opt-label">Paper size</span>
+          <div class="segmented" data-name="paperSize" id="paperSeg"></div>
+        </div>
       </div>
 
       <div class="pricebar">
-        <div>
-          <div class="price-label" id="priceDetail">—</div>
-          <div class="price-amount"><span id="priceAmount">0</span> <small id="priceCur">PKR</small></div>
+        <div class="price">
+          <span class="price-label" id="priceDetail">—</span>
+          <span class="price-amount"><span id="priceAmount">0</span> <small id="priceCur">PKR</small></span>
         </div>
-        <button class="pay" id="payBtn">Pay &amp; Print</button>
+        <button class="btn btn-primary btn-lg pay-btn" id="payBtn" type="button">Pay &amp; print</button>
       </div>
-      <p class="err hidden" id="jobErr"></p>
+      <p class="pay-hint hidden" id="payHint"></p>
+      <p class="form-error hidden" id="jobErr" role="alert"></p>
     </section>
 
     <!-- Step 3: status -->
-    <section id="statusView" class="hidden">
-      <div class="status-icon" id="stIcon">⏳</div>
-      <h2 id="stTitle">Working…</h2>
-      <p class="sub" id="stMsg"></p>
-      <div class="status-meta" id="stMeta"></div>
-      <button class="secondary" id="againBtn">Print another</button>
+    <section id="statusView" class="view hidden">
+      <div class="status">
+        <span class="status-ic" id="stIcon"></span>
+        <h2 id="stTitle">Working…</h2>
+        <p id="stMsg"></p>
+      </div>
+      <dl class="receipt" id="stMeta"></dl>
+      <div class="status-actions">
+        <button class="btn btn-primary btn-lg btn-block hidden" id="retryPay" type="button">Try payment again</button>
+        <button class="btn btn-lg btn-block" id="againBtn" type="button">Print something else</button>
+      </div>
     </section>
 
-    <footer class="foot">Files are deleted right after printing.</footer>
+    <footer class="foot">
+      <span><i data-icon="lock"></i> Files are deleted automatically after printing</span>
+      <a href="/" target="_blank" rel="noopener">Powered by QRPrint</a>
+    </footer>
   </main>
+
+  <input type="file" id="docInput" multiple hidden
+    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,application/pdf,image/*">
+  <input type="file" id="photoInput" accept="image/*" hidden>
+
+  <!-- Page editor -->
+  <div class="modal hidden" id="editor" role="dialog" aria-modal="true" aria-labelledby="edTitle">
+    <div class="modal-head">
+      <button class="icon-btn" id="edBack" type="button" aria-label="Cancel"><i data-icon="arrowLeft"></i></button>
+      <div class="modal-title"><b id="edTitle">Edit pages</b><small id="edSub"></small></div>
+      <button class="btn btn-primary btn-sm" id="edDone" type="button">Done</button>
+    </div>
+    <div class="ed-tools">
+      <button class="chip-btn" data-sel="all" type="button">All</button>
+      <button class="chip-btn" data-sel="none" type="button">None</button>
+      <button class="chip-btn" data-sel="odd" type="button">Odd</button>
+      <button class="chip-btn" data-sel="even" type="button">Even</button>
+      <button class="chip-btn" id="edRotateAll" type="button"><i data-icon="rotate"></i> Rotate all</button>
+    </div>
+    <p class="ed-help">Tap a page to include or skip it. Use <i data-icon="rotate"></i> to turn a page.</p>
+    <div class="ed-grid" id="edGrid"></div>
+  </div>
+
+  <!-- Photo cropper -->
+  <div class="modal hidden" id="cropper" role="dialog" aria-modal="true" aria-labelledby="crTitle">
+    <div class="modal-head">
+      <button class="icon-btn" id="crCancel" type="button" aria-label="Cancel"><i data-icon="close"></i></button>
+      <div class="modal-title"><b id="crTitle">Line up the photo</b><small id="crSub">Drag and zoom so it fills the frame</small></div>
+      <button class="btn btn-primary btn-sm" id="crDone" type="button">Use photo</button>
+    </div>
+    <div class="cr-stage" id="crStage"><div class="cr-frame" id="crFrame"></div></div>
+    <div class="cr-controls">
+      <i data-icon="minus"></i>
+      <input type="range" id="crZoom" min="1" max="5" step="0.01" value="1" aria-label="Zoom">
+      <i data-icon="plus"></i>
+      <button class="btn btn-sm" id="crRotate" type="button"><i data-icon="rotate"></i> Rotate</button>
+    </div>
+  </div>
+
   <script src="/shared/ui.js"></script>
-  <script src="app.js"></script>
+  <script src="/p/app.js"></script>
 </body>
 </html>

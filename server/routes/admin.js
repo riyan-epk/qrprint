@@ -4,7 +4,7 @@ import express from 'express';
 import { config } from '../config.js';
 import { db, randomKey } from '../db.js';
 import { effectiveStatus, setSubscription } from '../subscription.js';
-import { requireAdmin, hashPassword } from '../security.js';
+import { requireAdmin, hashPassword, MIN_PASSWORD } from '../security.js';
 
 export const adminRouter = express.Router();
 adminRouter.use(express.json());
@@ -25,6 +25,9 @@ function shopSummary(shop) {
     subscription: { ...effectiveStatus(shop), feeMonthly: shop.subscription.feeMonthly },
     hasPassword: !!shop.auth?.passwordHash,
     agentOnline: !!online,
+    agentVersion: shop.runtime?.agent?.version || null,
+    pcLinked: !!shop.runtime?.machineId,
+    printer: shop.runtime?.printer || null,
     jobs: jobs.length,
     phoneUrl: `${baseUrl()}/p/?s=${shop.slug}`,
   };
@@ -42,6 +45,8 @@ adminRouter.get('/shops/:id', (req, res) => {
   res.json({
     ...shopSummary(shop),
     agentKey: shop.agentKey,
+    pcLinkedAt: shop.runtime?.machineLinkedAt || null,
+    agentOs: shop.runtime?.agent?.os || null,
     dashboardUrl: `${baseUrl()}/dashboard/`,
     qrUrl: `/api/qr?shop=${shop.slug}`,
   });
@@ -53,6 +58,9 @@ adminRouter.post('/shops', (req, res) => {
   if (!name) return res.status(400).json({ error: 'Shop name is required.' });
   const feeMonthly = Number(req.body?.feeMonthly) || 1500;
   const password = req.body?.password;
+  if (password && String(password).length < MIN_PASSWORD) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
+  }
 
   const shop = db.createShop({
     name, feeMonthly,
@@ -75,7 +83,9 @@ adminRouter.post('/shops/:id/password', (req, res) => {
   const shop = db.shop(req.params.id);
   if (!shop) return res.status(404).json({ error: 'Shop not found.' });
   const password = String(req.body?.password || '');
-  if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters.' });
+  if (password.length < MIN_PASSWORD) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
+  }
   db.updateShop(shop.id, { auth: { passwordHash: hashPassword(password) } });
   db.logEvent('shop.password_set', { shopId: shop.id });
   res.json({ ok: true });
@@ -106,9 +116,20 @@ adminRouter.post('/shops/:id/rotate-agent-key', (req, res) => {
   const shop = db.shop(req.params.id);
   if (!shop) return res.status(404).json({ error: 'Shop not found.' });
   const key = randomKey();
-  db.updateShop(shop.id, { agentKey: key });
+  // A new key is a fresh install: the next PC to use it becomes the linked one.
+  db.updateShop(shop.id, { agentKey: key, runtime: { machineId: null, machineLinkedAt: null } });
   db.logEvent('shop.agent_key_rotated', { shopId: shop.id });
   res.json({ ok: true, agentKey: key });
+});
+
+// Unlink the shop's agent from its PC (shop got a new computer). The next PC
+// that connects with the key becomes the linked one.
+adminRouter.post('/shops/:id/unlink-pc', (req, res) => {
+  const shop = db.shop(req.params.id);
+  if (!shop) return res.status(404).json({ error: 'Shop not found.' });
+  db.updateShop(shop.id, { runtime: { machineId: null, machineLinkedAt: null } });
+  db.logEvent('shop.pc_unlinked', { shopId: shop.id });
+  res.json({ ok: true });
 });
 
 // Delete a shop.

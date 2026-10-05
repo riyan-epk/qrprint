@@ -32,10 +32,14 @@ def print_part(part, options, cfg):
 
     # Paper size: prefer the customer's choice, else the machine default.
     paper = options.get("paperSize") or cfg.get("paper_size", "A4")
+    # ID card copies / passport photos must print at true size, not shrunk
+    # to the printer's margins.
+    actual = options.get("scale") == "actual"
 
     if mode == "dry":
         print(f"   [dry-run] would print {os.path.basename(part['path'])} "
-              f"copies={copies} color={color} sides={sides} paper={paper}")
+              f"copies={copies} color={color} sides={sides} paper={paper}"
+              f"{' scale=actual' if actual else ''}")
         return
 
     system = platform.system()
@@ -43,9 +47,9 @@ def print_part(part, options, cfg):
         # SumatraPDF prints to the printer's default paper size and scales to fit
         # ("fit"). For true multi-size selection, use a Linux/Pi + CUPS setup, or
         # set the printer's default paper to match.
-        _print_windows(part["path"], copies, color, sides, cfg)
+        _print_windows(part["path"], copies, color, sides, cfg, actual)
     else:
-        _print_cups(part["path"], copies, color, sides, paper, cfg)
+        _print_cups(part["path"], copies, color, sides, paper, cfg, actual)
 
 
 def _resolve_sumatra(cfg):
@@ -73,9 +77,9 @@ def _resolve_sumatra(cfg):
     return p  # fall back; _run will raise a clear error if it's missing
 
 
-def _print_windows(path, copies, color, sides, cfg):
+def _print_windows(path, copies, color, sides, cfg, actual=False):
     sumatra = _resolve_sumatra(cfg)
-    settings = ["fit", "color" if color else "monochrome"]
+    settings = ["noscale" if actual else "fit", "color" if color else "monochrome"]
     settings.append("duplexlong" if sides == "two-sided" else "simplex")
     if copies > 1:
         settings.append(f"{copies}x")
@@ -89,7 +93,7 @@ def _print_windows(path, copies, color, sides, cfg):
     _run(cmd)
 
 
-def _print_cups(path, copies, color, sides, paper, cfg):
+def _print_cups(path, copies, color, sides, paper, cfg, actual=False):
     lp_sides = "two-sided-long-edge" if sides == "two-sided" else "one-sided"
     cmd = ["lp"]
     printer = cfg.get("printer_name")
@@ -97,10 +101,10 @@ def _print_cups(path, copies, color, sides, paper, cfg):
         cmd += ["-d", printer]
     cmd += ["-n", str(copies),
             "-o", f"sides={lp_sides}",
-            "-o", f"ColorModel={'RGB' if color else 'Gray'}",
-            "-o", "fit-to-page",
-            "-o", f"media={paper}",
-            path]
+            "-o", f"ColorModel={'RGB' if color else 'Gray'}"]
+    if not actual:
+        cmd += ["-o", "fit-to-page"]
+    cmd += ["-o", f"media={paper}", path]
     _run(cmd)
 
 

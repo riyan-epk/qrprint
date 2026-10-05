@@ -3,94 +3,77 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Provider Console · QRPrint</title>
+  <title>Provider console · QRPrint</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/shared/ui.css">
-  <style>
-    :root{--bg:#0f1419;--panel:#171d24;--surface:#1f2730;--line:#2b343d;--ink:#eef2f5;--muted:#98a3ad;--accent:#2bb3bd;--good:#3ecf8e;--warn:#e3a53a;--crit:#e5675c}
-    @media(prefers-color-scheme:light){:root{--bg:#eef1f4;--panel:#fff;--surface:#f4f6f8;--line:#e3e7eb;--ink:#141a1f;--muted:#5c6771;--accent:#0c8f99}}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;line-height:1.5}
-    .wrap{max-width:840px;margin:32px auto;padding:0 18px}
-    h1{font-size:1.4rem;margin:0 0 4px}.tag{color:var(--muted);font-size:.85rem;margin:0 0 20px}
-    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
-    .hidden{display:none!important}
-    label{display:block;font-size:.8rem;color:var(--muted);margin:0 0 5px}
-    input{width:100%;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:10px 12px;font-size:.95rem}
-    .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:8px 14px;font-weight:600;cursor:pointer;font-size:.85rem}
-    .btn:hover{border-color:var(--accent)}
-    .btn.crit{background:var(--crit);border-color:var(--crit);color:#fff}
-    .btn.good{background:var(--good);border-color:var(--good);color:#0f1419}
-    .btn.primary{background:var(--accent);border-color:var(--accent);color:#0f1419}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
-    .row>div{flex:1;min-width:120px}
-    .err{color:var(--crit);font-size:.85rem;margin-top:8px}
-    h2{font-size:1.05rem;margin:0 0 12px}
-    .shop{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--surface)}
-    .shop-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-    .shop-name{font-weight:700;font-size:1.05rem}
-    .shop-id{font-family:ui-monospace,monospace;color:var(--muted);font-size:.8rem}
-    .pill{font-size:.72rem;padding:3px 9px;border-radius:999px;font-weight:600}
-    .pill.active{background:color-mix(in srgb,var(--good) 20%,transparent);color:var(--good)}
-    .pill.grace{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn)}
-    .pill.suspended{background:color-mix(in srgb,var(--crit) 20%,transparent);color:var(--crit)}
-    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
-    .shop-meta{color:var(--muted);font-size:.82rem;margin:8px 0}
-    .shop-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .detail{margin-top:12px;padding:12px;background:var(--bg);border:1px solid var(--line);border-radius:9px;font-size:.82rem}
-    .detail code{font-family:ui-monospace,monospace;word-break:break-all;background:var(--surface);padding:2px 6px;border-radius:5px;display:inline-block;margin:2px 0}
-    .detail div{margin-bottom:8px}
-    .events{font-family:ui-monospace,monospace;font-size:.76rem;color:var(--muted);max-height:200px;overflow:auto}
-    .events div{padding:2px 0;border-bottom:1px solid var(--line)}
-    a{color:var(--accent)}
-    .btn{transition:transform .12s ease,filter .15s}.btn:hover{filter:brightness(1.08)}.btn:active{transform:scale(.96)}
-    .panel{animation:aIn .38s both}.shop{animation:aIn .3s both;transition:border-color .18s,transform .15s}
-    .shop:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
-    input{transition:border-color .15s,box-shadow .15s}
-    input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
-    @keyframes aIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-    @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-  </style>
+  <link rel="stylesheet" href="/shared/app.css">
+  <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
-  <div class="wrap">
-    <h1>🔒 Provider Console</h1>
-    <p class="tag">Create and manage all your shops.</p>
+  <header class="app-header">
+    <div class="app-container app-header-row">
+      <a class="brand" href="/admin/"><span class="brand-mark"><i data-icon="printer"></i></span><span>QR<b>Print</b></span></a>
+      <span class="header-sep"></span>
+      <span class="shop-name">Provider console</span>
+      <div class="header-right">
+        <a class="btn btn-ghost btn-sm hide-sm" href="/" target="_blank" rel="noopener">View site <i data-icon="external"></i></a>
+        <button class="btn btn-sm" id="logoutBtn" type="button"><i data-icon="logout"></i><span class="hide-sm">Log out</span></button>
+      </div>
+    </div>
+  </header>
 
-    <!-- login -->
-    <div class="panel" id="loginPanel">
-      <label>Admin key</label>
-      <input id="key" type="password" placeholder="admin key from the server .env">
-      <div class="row" style="margin-top:12px"><button class="btn good" id="loginBtn">Unlock</button></div>
-      <div class="err hidden" id="loginErr"></div>
+  <main class="app-container app-main">
+    <div class="page-head">
+      <div>
+        <h1>Shops</h1>
+        <p class="muted">Create shops, manage subscriptions and print agents.</p>
+      </div>
+      <button class="btn btn-primary" id="toggleAdd" type="button"><i data-icon="plus"></i> Add shop</button>
     </div>
 
-    <div id="console" class="hidden">
-      <!-- add shop -->
-      <div class="panel">
-        <h2>➕ Add a shop</h2>
-        <div class="row">
-          <div><label>Shop name</label><input id="newName" type="text" placeholder="e.g. Ali Photostat"></div>
-          <div><label>Dashboard password</label><input id="newPass" type="text" placeholder="give to the shopkeeper"></div>
-          <div style="flex:0 0 120px"><label>Fee (PKR/mo)</label><input id="newFee" type="number" value="1500"></div>
-          <button class="btn primary" id="addBtn">Create</button>
+    <div class="kpis">
+      <div class="kpi card"><div class="kpi-top"><span>Shops</span><span class="kpi-ic"><i data-icon="store"></i></span></div><div class="kpi-val" id="kShops">0</div></div>
+      <div class="kpi card"><div class="kpi-top"><span>Agents online</span><span class="kpi-ic"><i data-icon="printer"></i></span></div><div class="kpi-val" id="kOnline">0</div></div>
+      <div class="kpi card"><div class="kpi-top"><span>Payment due / paused</span><span class="kpi-ic"><i data-icon="alert"></i></span></div><div class="kpi-val" id="kDue">0</div></div>
+      <div class="kpi card"><div class="kpi-top"><span>Monthly fees (active)</span><span class="kpi-ic"><i data-icon="cash"></i></span></div><div class="kpi-val"><span id="kMrr">0</span> <small>PKR</small></div></div>
+    </div>
+
+    <!-- add shop -->
+    <div class="card add-card hidden" id="addCard">
+      <div class="card-head"><div><div class="card-title">Add a shop</div><div class="card-sub">You'll get the Shop ID, links and agent key to give the shopkeeper.</div></div></div>
+      <div class="card-pad">
+        <div class="add-grid">
+          <label class="field"><span>Shop name</span><input class="input" id="newName" type="text" placeholder="e.g. Campus Photostat" maxlength="60"></label>
+          <label class="field"><span>Dashboard password</span><input class="input" id="newPass" type="text" placeholder="At least 8 characters" autocomplete="off"></label>
+          <label class="field"><span>Monthly fee</span><span class="input-suffix"><input class="input" id="newFee" type="number" value="1500" min="0"><span>PKR</span></span></label>
         </div>
-        <div class="err hidden" id="addErr"></div>
-        <div class="detail hidden" id="newShopBox"></div>
-      </div>
-
-      <!-- shops list -->
-      <div class="panel">
-        <h2>🏪 Shops (<span id="shopCount">0</span>)</h2>
-        <div id="shops"></div>
-      </div>
-
-      <!-- events -->
-      <div class="panel">
-        <h2>📋 Activity</h2>
-        <div class="events" id="events"></div>
+        <div class="add-actions">
+          <p class="form-error hidden" id="addErr" role="alert"></p>
+          <button class="btn" id="cancelAdd" type="button">Cancel</button>
+          <button class="btn btn-primary" id="addBtn" type="button">Create shop</button>
+        </div>
+        <div class="creds hidden" id="newShopBox"></div>
       </div>
     </div>
-  </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title">All shops</div><div class="card-sub" id="shopCount">—</div></div>
+      </div>
+      <div id="shops"><div class="empty"><span class="spinner"></span></div></div>
+    </div>
+
+    <div class="card activity-card">
+      <div class="card-head"><div><div class="card-title">Recent activity</div><div class="card-sub">Latest events across all shops</div></div></div>
+      <ul class="events" id="events"></ul>
+    </div>
+  </main>
+
   <script src="/shared/ui.js"></script>
-  <script src="app.js"></script>
+  <script src="/admin/app.js"></script>
 </body>
 </html>

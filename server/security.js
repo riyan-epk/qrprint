@@ -6,6 +6,8 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import { db } from './db.js';
 
+export const MIN_PASSWORD = 8;
+
 // --- password hashing (scrypt) ----------------------------------------------
 
 export function hashPassword(pw) {
@@ -21,6 +23,19 @@ export function verifyPassword(pw, stored) {
   const a = Buffer.from(hash, 'hex');
   const b = Buffer.from(test, 'hex');
   return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// Constant-time string compare (for the admin key).
+export function safeEqual(a, b) {
+  const x = crypto.createHash('sha256').update(String(a)).digest();
+  const y = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(x, y);
+}
+
+// A short fingerprint of a secret. Stored in the session so that changing the
+// password (or the admin key) signs out every existing session.
+function fingerprint(secret) {
+  return crypto.createHash('sha256').update(String(secret || 'none')).digest('base64url').slice(0, 12);
 }
 
 // --- signed session token ----------------------------------------------------
@@ -45,13 +60,14 @@ function unsign(token) {
   } catch { return null; }
 }
 
-const COOKIE = 'qrp_session';
+// Separate cookies, so logging into the provider console doesn't log a shop
+// out in the same browser (and vice versa).
+const COOKIES = { shop: 'qrp_session', admin: 'qrp_admin' };
 const MAX_AGE_MS = 12 * 60 * 60 * 1000; // 12h
 
-// claims: { role: 'shop', shopId } or { role: 'admin' }
-export function setSession(res, claims) {
-  const token = sign({ ...claims, exp: Date.now() + MAX_AGE_MS });
-  res.cookie(COOKIE, token, {
+function setCookie(res, role, claims) {
+  const token = sign({ ...claims, role, exp: Date.now() + MAX_AGE_MS });
+  res.cookie(COOKIES[role], token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: config.isProd,          // require HTTPS in production
@@ -60,8 +76,16 @@ export function setSession(res, claims) {
   });
 }
 
-export function clearSession(res) {
-  res.clearCookie(COOKIE, { path: '/' });
+export function setShopSession(res, shop) {
+  setCookie(res, 'shop', { shopId: shop.id, pv: fingerprint(shop.auth?.passwordHash) });
+}
+
+export function setAdminSession(res) {
+  setCookie(res, 'admin', { kv: fingerprint(config.adminKey) });
+}
+
+export function clearSession(res, role) {
+  res.clearCookie(COOKIES[role], { path: '/' });
 }
 
 function readCookie(req, name) {
@@ -69,13 +93,26 @@ function readCookie(req, name) {
   if (!header) return null;
   for (const part of header.split(';')) {
     const [k, ...v] = part.trim().split('=');
-    if (k === name) return decodeURIComponent(v.join('='));
+    if (k === name) {
+      try { return decodeURIComponent(v.join('=')); } catch { return null; }
+    }
   }
   return null;
 }
 
-function session(req) {
-  return unsign(readCookie(req, COOKIE));
+// The logged-in shop, or null. The session dies if the shop is deleted or its
+// password changes.
+export function shopFromSession(req) {
+  const s = unsign(readCookie(req, COOKIES.shop));
+  if (!s || s.role !== 'shop' || !s.shopId) return null;
+  const shop = db.shop(s.shopId);
+  if (!shop || s.pv !== fingerprint(shop.auth?.passwordHash)) return null;
+  return shop;
+}
+
+export function isAdminSession(req) {
+  const s = unsign(readCookie(req, COOKIES.admin));
+  return !!(s && s.role === 'admin' && s.kv === fingerprint(config.adminKey));
 }
 
 // --- policy ------------------------------------------------------------------
@@ -83,9 +120,9 @@ function session(req) {
 // Multi-tenant: the dashboard always requires login, because logging in is how
 // we know WHICH shop the user manages. Sets req.shopId for downstream handlers.
 export function requireShopAuth(req, res, next) {
-  const s = session(req);
-  if (s && s.role === 'shop' && s.shopId && db.shop(s.shopId)) {
-    req.shopId = s.shopId;
+  const shop = shopFromSession(req);
+  if (shop) {
+    req.shopId = shop.id;
     return next();
   }
   return res.status(401).json({ error: 'Login required.', code: 'auth' });
@@ -93,9 +130,9 @@ export function requireShopAuth(req, res, next) {
 
 export function requireAdmin(req, res, next) {
   // Header key (for API/automation) OR an admin session cookie (for the page).
-  if (req.get('x-admin-key') === config.adminKey) return next();
-  const s = session(req);
-  if (s && s.role === 'admin') return next();
+  const key = req.get('x-admin-key');
+  if (key && safeEqual(key, config.adminKey)) return next();
+  if (isAdminSession(req)) return next();
   return res.status(401).json({ error: 'Admin auth required.', code: 'auth' });
 }
 

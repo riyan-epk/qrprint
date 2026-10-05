@@ -48,6 +48,16 @@ export const config = {
   jobRetentionDays: Number(process.env.JOB_RETENTION_DAYS || 7),    // job history records
   graceDays: Number(process.env.GRACE_DAYS || 3),
 
+  // Public contact details shown on the homepage and in the shop dashboard.
+  contact: {
+    email: process.env.CONTACT_EMAIL || 'ryaan.epk@gmail.com',
+    whatsapp: process.env.CONTACT_WHATSAPP || '+92 332 522 4700',
+  },
+
+  // Per-shop JazzCash checkout isn't finished yet (see JAZZCASH.md). Until it
+  // is, the dashboard shows it as "coming soon" and shops can't switch to it.
+  jazzcashEnabled: process.env.JAZZCASH_ENABLED === '1' || process.env.JAZZCASH_ENABLED === 'true',
+
   // Payment provider: 'mock' (offline, always succeeds) or 'jazzcash'.
   paymentProvider: process.env.PAYMENT_PROVIDER || 'mock',
   jazzcash: {

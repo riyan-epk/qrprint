@@ -177,8 +177,10 @@ function deepMerge(base, patch) {
   return out;
 }
 
+// Job and file IDs double as the customer's only handle on their job, so the
+// random part comes from the CSPRNG and is long enough that it can't be guessed.
 export function makeId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  return `${prefix}_${Date.now().toString(36)}${crypto.randomBytes(8).toString('hex')}`;
 }
 
 export function randomKey() {

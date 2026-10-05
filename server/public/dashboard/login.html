@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shop login · QRPrint</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/shared/ui.css">
+</head>
+<body>
+  <main class="auth">
+    <a class="brand" href="/"><span class="brand-mark"><i data-icon="printer"></i></span><span>QR<b>Print</b></span></a>
+    <form class="card auth-card" id="loginForm" novalidate>
+      <h1>Shop login</h1>
+      <p class="lead">Sign in to manage your print jobs, prices and payments.</p>
+      <label class="field"><span>Shop ID</span>
+        <input class="input" id="loginShop" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </label>
+      <label class="field"><span>Password</span>
+        <input class="input" id="loginPw" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary btn-lg btn-block" id="loginBtn" type="submit">Sign in</button>
+      <p class="form-error hidden" id="loginErr" role="alert"></p>
+    </form>
+    <p class="auth-foot">Forgot your password? Contact support at
+      <a href="mailto:{{CONTACT_EMAIL}}">{{CONTACT_EMAIL}}</a> or
+      <a href="{{WHATSAPP_LINK}}" target="_blank" rel="noopener">WhatsApp</a>.</p>
+    <p class="auth-foot"><a href="/"><i data-icon="arrowLeft"></i> Back to home</a></p>
+  </main>
+  <script src="/shared/ui.js"></script>
+  <script src="/dashboard/login.js"></script>
+</body>
+</html>

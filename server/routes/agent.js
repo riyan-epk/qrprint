@@ -8,12 +8,42 @@ import { refund } from '../payments.js';
 export const agentRouter = express.Router();
 
 // Auth: the agent key identifies the shop.
+//
+// PC lock: agents v2+ send a machine fingerprint (x-agent-machine). The first
+// PC to connect with a shop's key is remembered, and the key then only works
+// on that PC — so a copied or leaked key can't be used elsewhere to pull the
+// shop's customer documents. The provider can unlink it in the console (or
+// rotate the key) when the shop changes computers.
+const MACHINE_RE = /^[a-f0-9]{16,64}$/;
+const lastMismatchLog = new Map();   // shopId -> time, so a stray agent can't flood the event log
+
 agentRouter.use((req, res, next) => {
   const key = req.get('x-agent-key');
   const shop = key ? db.shopByAgentKey(key) : null;
   if (!shop) return res.status(401).json({ error: 'Bad agent key.' });
-  req.shop = shop;
+
+  const machine = String(req.get('x-agent-machine') || '').toLowerCase();
+  const bound = shop.runtime?.machineId;
+  if (bound) {
+    if (machine !== bound) {
+      const now = Date.now();
+      if (now - (lastMismatchLog.get(shop.id) || 0) > 10 * 60 * 1000) {
+        lastMismatchLog.set(shop.id, now);
+        db.logEvent('agent.other_pc_blocked', { shopId: shop.id });
+      }
+      return res.status(409).json({ error: 'This agent key is linked to another computer.', code: 'other_pc' });
+    }
+  } else if (MACHINE_RE.test(machine)) {
+    db.updateShop(shop.id, { runtime: { machineId: machine, machineLinkedAt: new Date().toISOString() } });
+    db.logEvent('agent.pc_linked', { shopId: shop.id });
+  }
+  req.shop = db.shop(shop.id);
   next();
+});
+
+// Lets the agent confirm its key (and show the shop name) during setup.
+agentRouter.get('/whoami', (req, res) => {
+  res.json({ shop: { name: req.shop.name, slug: req.shop.slug } });
 });
 
 // Claim the next job for THIS shop (oldest paid + queued).
@@ -109,10 +139,16 @@ agentRouter.post('/jobs/:id/report', express.json(), async (req, res) => {
   res.status(400).json({ error: "result must be 'printed' or 'failed'." });
 });
 
-// Heartbeat -> updates this shop's runtime status.
+// Heartbeat -> updates this shop's runtime status. Every field is written
+// explicitly (null when absent) so a cleared printer problem doesn't linger.
+const clip = (v, n = 80) => (v == null ? null : String(v).slice(0, n));
 agentRouter.post('/heartbeat', express.json(), (req, res) => {
-  const { printer } = req.body || {};
-  db.updateShop(req.shop.id, { runtime: { lastHeartbeat: new Date().toISOString(), printer: printer || {} } });
+  const { printer = {}, agent = {} } = req.body || {};
+  db.updateShop(req.shop.id, { runtime: {
+    lastHeartbeat: new Date().toISOString(),
+    printer: { online: printer.online !== false, name: clip(printer.name), issue: clip(printer.issue, 40) },
+    agent: { version: clip(agent.version, 20), os: clip(agent.os, 40) },
+  } });
   res.json({ ok: true });
 });
 

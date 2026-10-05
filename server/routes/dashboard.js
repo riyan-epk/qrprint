@@ -2,12 +2,13 @@
 // requireShopAuth). A shopkeeper only ever sees their own shop.
 import express from 'express';
 import fs from 'node:fs';
+import { config } from '../config.js';
 import { db } from '../db.js';
 import { effectiveStatus, statusMessage } from '../subscription.js';
 import { refund } from '../payments.js';
 import { overallStatus } from './phone.js';
 import { clampInt } from '../pricing.js';
-import { requireShopAuth, verifyPassword, hashPassword } from '../security.js';
+import { requireShopAuth, verifyPassword, hashPassword, setShopSession, MIN_PASSWORD } from '../security.js';
 
 export const dashboardRouter = express.Router();
 dashboardRouter.use(requireShopAuth);
@@ -16,6 +17,35 @@ function isToday(iso) {
   if (!iso) return false;
   const d = new Date(iso), n = new Date();
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
+// Payment settings as the browser sees them: secrets are never sent back, only
+// whether one is saved. Leaving a secret field blank on save keeps the old one.
+function publicPaymentAccount(pa = {}) {
+  return {
+    provider: pa.provider || 'cash',
+    autoApprove: !!pa.autoApprove,
+    display: pa.display || 'Cash at counter',
+    jazzcash: {
+      merchantId: pa.jazzcash?.merchantId || '',
+      hasPassword: !!pa.jazzcash?.password,
+      hasIntegritySalt: !!pa.jazzcash?.integritySalt,
+    },
+    safepay: {
+      environment: pa.safepay?.environment === 'production' ? 'production' : 'sandbox',
+      apiKey: pa.safepay?.apiKey || '',
+      hasSecretKey: !!pa.safepay?.secretKey,
+    },
+  };
+}
+
+function publicSettings(shop) {
+  return {
+    name: shop.name, slug: shop.slug, mode: shop.mode, unattended: shop.unattended,
+    capabilities: shop.capabilities, pricing: shop.pricing,
+    payment_account: publicPaymentAccount(shop.payment_account),
+    features: { jazzcash: config.jazzcashEnabled, safepay: true },
+  };
 }
 
 // Guard: the job must belong to the logged-in shop.
@@ -40,7 +70,7 @@ dashboardRouter.get('/overview', (req, res) => {
   res.json({
     shop: { name: shop.name, slug: shop.slug, mode: shop.mode, unattended: shop.unattended },
     subscription: { ...effectiveStatus(shop), ...statusMessage(shop), feeMonthly: shop.subscription.feeMonthly },
-    payment_account: shop.payment_account,
+    payment: { provider: shop.payment_account?.provider || 'cash', display: shop.payment_account?.display || '' },
     printer: shop.runtime?.printer || null,
     lastHeartbeat: shop.runtime?.lastHeartbeat || null,
     earningsToday, refundedToday, printsToday: paidToday.length,
@@ -54,7 +84,8 @@ dashboardRouter.get('/jobs', (req, res) => {
   const jobs = db.jobs(req.shopId).slice(0, limit).map(j => ({
     id: j.id,
     createdAt: j.createdAt,
-    file: { originalName: j.file.originalName, pages: j.file.pages },
+    kind: j.kind || 'doc',
+    file: { originalName: j.file.originalName, pages: j.file.contentPages || j.file.pages, items: j.file.items || null },
     options: j.options,
     amount: j.price.amount,
     currency: j.price.currency,
@@ -127,24 +158,22 @@ dashboardRouter.post('/jobs/:id/refund', async (req, res) => {
 dashboardRouter.post('/change-password', (req, res) => {
   const shop = db.shop(req.shopId);
   const { currentPassword, newPassword } = req.body || {};
-  if (!newPassword || String(newPassword).length < 4) {
-    return res.status(400).json({ error: 'New password must be at least 4 characters.' });
+  if (!newPassword || String(newPassword).length < MIN_PASSWORD) {
+    return res.status(400).json({ error: `New password must be at least ${MIN_PASSWORD} characters.` });
   }
   const hash = shop.auth?.passwordHash;
   if (hash && !verifyPassword(currentPassword || '', hash)) {
     return res.status(401).json({ error: 'Current password is wrong.' });
   }
-  db.updateShop(shop.id, { auth: { passwordHash: hashPassword(String(newPassword)) } });
+  const updated = db.updateShop(shop.id, { auth: { passwordHash: hashPassword(String(newPassword)) } });
+  // Other devices are signed out by the new password; keep this one signed in.
+  setShopSession(res, updated);
   db.logEvent('shop.password_changed', { shopId: shop.id });
   res.json({ ok: true });
 });
 
 dashboardRouter.get('/settings', (req, res) => {
-  const shop = db.shop(req.shopId);
-  res.json({
-    name: shop.name, slug: shop.slug, mode: shop.mode, unattended: shop.unattended,
-    capabilities: shop.capabilities, pricing: shop.pricing, payment_account: shop.payment_account,
-  });
+  res.json(publicSettings(db.shop(req.shopId)));
 });
 
 dashboardRouter.post('/settings', (req, res) => {
@@ -171,33 +200,38 @@ dashboardRouter.post('/settings', (req, res) => {
   }
   if (b.payment_account) {
     const pa = b.payment_account;
-    const provider = ['cash', 'jazzcash', 'safepay'].includes(pa.provider) ? pa.provider : 'cash';
     const cur = db.shop(req.shopId).payment_account || {};
-    const s = (v, fallback, max = 128) => String(v ?? fallback ?? '').trim().slice(0, max);
+    const provider = ['cash', 'jazzcash', 'safepay'].includes(pa.provider) ? pa.provider : 'cash';
+    if (provider === 'jazzcash' && !config.jazzcashEnabled && cur.provider !== 'jazzcash') {
+      return res.status(400).json({ error: 'JazzCash online payments are coming soon. Please use Safepay or Cash for now.' });
+    }
+    const s = (v, max = 128) => String(v ?? '').trim().slice(0, max);
+    // Secrets: blank means "keep what's saved".
+    const secret = (v, saved) => s(v) || saved || '';
     patch.payment_account = {
       provider,
       // Cash only: print without waiting for the shopkeeper to tap Approve.
       autoApprove: !!pa.autoApprove,
       display: provider === 'cash' ? 'Cash at counter'
-        : (s(pa.display, '', 80) || (provider === 'jazzcash' ? 'JazzCash' : 'Safepay')),
+        : (s(pa.display, 80) || (provider === 'jazzcash' ? 'JazzCash' : 'Safepay')),
       jazzcash: {
-        merchantId: s(pa.jazzcash?.merchantId, cur.jazzcash?.merchantId, 64),
-        password: s(pa.jazzcash?.password, cur.jazzcash?.password),
-        integritySalt: s(pa.jazzcash?.integritySalt, cur.jazzcash?.integritySalt),
+        merchantId: s(pa.jazzcash?.merchantId ?? cur.jazzcash?.merchantId, 64),
+        password: secret(pa.jazzcash?.password, cur.jazzcash?.password),
+        integritySalt: secret(pa.jazzcash?.integritySalt, cur.jazzcash?.integritySalt),
       },
       safepay: {
         environment: pa.safepay?.environment === 'production' ? 'production' : 'sandbox',
-        apiKey: s(pa.safepay?.apiKey, cur.safepay?.apiKey),
-        secretKey: s(pa.safepay?.secretKey, cur.safepay?.secretKey),
+        apiKey: s(pa.safepay?.apiKey ?? cur.safepay?.apiKey),
+        secretKey: secret(pa.safepay?.secretKey, cur.safepay?.secretKey),
       },
     };
+    if (provider === 'safepay' && !patch.payment_account.safepay.apiKey) {
+      return res.status(400).json({ error: 'Enter your Safepay API key to accept online payments.' });
+    }
   }
   if (b.mode === 'shop' || b.mode === 'kiosk') { patch.mode = b.mode; patch.unattended = b.mode === 'kiosk'; }
 
   const shop = db.updateShop(req.shopId, patch);
   db.logEvent('settings.updated', { shopId: req.shopId, keys: Object.keys(patch) });
-  res.json({ ok: true, settings: {
-    name: shop.name, slug: shop.slug, mode: shop.mode, unattended: shop.unattended,
-    capabilities: shop.capabilities, pricing: shop.pricing, payment_account: shop.payment_account,
-  }});
+  res.json({ ok: true, settings: publicSettings(shop) });
 });

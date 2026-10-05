@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QRPrint — Self-service QR printing for print shops</title>
+  <meta name="description" content="QRPrint turns any print shop into a self-service counter. Customers scan a QR code, upload a PDF, Word file or photo, pay, and it prints automatically.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/shared/ui.css">
+  <link rel="stylesheet" href="/site/site.css">
+</head>
+<body>
+  <header class="site-header" id="top">
+    <div class="container header-row">
+      <a class="brand" href="/" aria-label="QRPrint home"><span class="brand-mark"><i data-icon="printer"></i></span><span>QR<b>Print</b></span></a>
+      <nav class="site-nav" id="siteNav" aria-label="Main">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#payments">Payments</a>
+        <a href="#faq">FAQ</a>
+        <a href="#contact">Contact</a>
+        <a class="nav-login" href="/dashboard/">Shop login</a>
+      </nav>
+      <div class="header-cta">
+        <a class="btn btn-ghost" href="/dashboard/">Shop login</a>
+        <a class="btn btn-primary" href="#contact">Get started <i data-icon="arrowRight"></i></a>
+      </div>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="siteNav"><i data-icon="menu"></i></button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="chip"><i data-icon="shield"></i> Built for print &amp; photocopy shops in Pakistan</span>
+          <h1 class="display">Scan. Pay.<br><em>It prints.</em></h1>
+          <p class="lead">QRPrint turns your shop into a self-service print counter. Customers scan a QR code, upload a PDF, Word file or photo from their phone, choose their options and pay — and it prints on your printer automatically.</p>
+          <ul class="hero-points">
+            <li><i data-icon="phone"></i> No app to install</li>
+            <li><i data-icon="files"></i> Many files at once</li>
+            <li><i data-icon="idcard"></i> CNIC &amp; passport photos</li>
+            <li><i data-icon="card"></i> Cash or Safepay</li>
+          </ul>
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="#contact">Get started <i data-icon="arrowRight"></i></a>
+            <a class="btn btn-lg" href="#how">See how it works</a>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="device">
+            <div class="device-screen">
+              <div class="m-top">
+                <span class="m-logo"><i data-icon="printer"></i></span>
+                <div><div class="m-shop">Campus Photostat</div><div class="m-sub">Self-service printing</div></div>
+              </div>
+              <div class="m-file">
+                <span class="m-file-ic"><i data-icon="file"></i></span>
+                <div class="m-file-txt"><b>Assignment-3.pdf</b><span>12 pages · 1.4 MB</span></div>
+              </div>
+              <div class="m-label">Copies</div>
+              <div class="m-row"><span class="m-step">−</span><span class="m-num">2</span><span class="m-step">+</span></div>
+              <div class="m-label">Colour</div>
+              <div class="m-seg"><span class="on">Black &amp; white</span><span>Colour</span></div>
+              <div class="m-label">Sides</div>
+              <div class="m-seg"><span>Single</span><span class="on">Double</span></div>
+              <div class="m-price">
+                <div><span>24 pages</span><b>120 PKR</b></div>
+                <span class="m-pay">Pay &amp; print</span>
+              </div>
+            </div>
+          </div>
+          <div class="float-card">
+            <span class="float-ic"><i data-icon="checkCircle"></i></span>
+            <div><b>Printed</b><span>Collect at the counter</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trust band -->
+    <section class="band-wrap">
+      <div class="container">
+        <div class="band">
+          <div class="band-item"><div class="band-val">No app</div><div class="band-title">Customers just scan</div><div class="band-sub">Opens in any phone browser</div></div>
+          <div class="band-item"><div class="band-val">100%</div><div class="band-title">Print money to you</div><div class="band-sub">Payments go to your own account</div></div>
+          <div class="band-item"><div class="band-val">Auto</div><div class="band-title">Files deleted</div><div class="band-sub">Removed right after printing</div></div>
+          <div class="band-item"><div class="band-val">Any</div><div class="band-title">Printer you have</div><div class="band-sub">Windows or Linux, USB or network</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="section" id="how">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">How it works</span>
+          <h2 class="display">From phone to paper <em>in four steps.</em></h2>
+          <p class="section-lead">No queue at the counter, no files sent over WhatsApp, no USB drives. The customer does it all from their phone.</p>
+        </div>
+        <ol class="steps">
+          <li class="step card">
+            <span class="step-num">1</span>
+            <h3>Scan the QR</h3>
+            <p>The customer scans the QR code on your counter. Your shop's print page opens straight away — no app, no sign-up.</p>
+          </li>
+          <li class="step card">
+            <span class="step-num">2</span>
+            <h3>Add files or photos</h3>
+            <p>Several PDFs, Word files or pictures at once — or a CNIC front and back. Pick pages, turn them, and see the price up front.</p>
+          </li>
+          <li class="step card">
+            <span class="step-num">3</span>
+            <h3>Choose &amp; pay</h3>
+            <p>Copies, colour, single or double-sided and page range. Pay online with Safepay, or in cash at the counter.</p>
+          </li>
+          <li class="step card">
+            <span class="step-num">4</span>
+            <h3>Collect the pages</h3>
+            <p>The job prints on your printer by itself, and the customer watches the status live on their phone.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section section-alt" id="features">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">For shop owners</span>
+          <h2 class="display">Everything you need <em>to run the counter.</em></h2>
+          <p class="section-lead">A simple dashboard on your phone or computer. Set it up once, then let customers serve themselves.</p>
+        </div>
+        <div class="features">
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="chart"></i></span>
+            <h3>Live dashboard</h3>
+            <p>Every job as it happens, today's earnings, the print queue and whether your printer is online.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="sliders"></i></span>
+            <h3>Your prices, your rules</h3>
+            <p>Set black &amp; white and colour prices per page, paper sizes, double-sided printing and file size limits.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="cash"></i></span>
+            <h3>Cash or online</h3>
+            <p>Approve cash jobs with one tap, let them print straight away, or take payment online through Safepay.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="idcard"></i></span>
+            <h3>CNIC copies &amp; passport photos</h3>
+            <p>Front and back of an ID card on one page, and cut-ready 35 × 45 mm photo sheets — printed at true size, in colour or black &amp; white.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="image"></i></span>
+            <h3>Fast photo uploads</h3>
+            <p>Pictures are made smaller on the customer's phone before upload, so they arrive quickly even on mobile data. iPhone photos work too.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="layers"></i></span>
+            <h3>Edit before printing</h3>
+            <p>Customers see every page, skip the ones they don't need, rotate sideways pages and put several files in order — before they pay.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="refresh"></i></span>
+            <h3>Reprint &amp; refund</h3>
+            <p>Paper jam or out of paper? Reprint the job from your dashboard, or refund it with a clear record.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="lock"></i></span>
+            <h3>Private by design</h3>
+            <p>Files are deleted right after printing. Unpaid uploads are cleared within 30 minutes, automatically.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-ic"><i data-icon="printer"></i></span>
+            <h3>Works with your printer</h3>
+            <p>A small print agent runs on the computer next to your printer. Colour, duplex and multiple paper sizes supported.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Payments -->
+    <section class="section" id="payments">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Payments</span>
+          <h2 class="display">Get paid <em>your way.</em></h2>
+          <p class="section-lead">Each shop connects its own payment account, so print money goes straight to the shop — QRPrint never holds it.</p>
+        </div>
+        <div class="pay-grid">
+          <div class="pay card">
+            <div class="pay-top"><span class="pay-ic"><i data-icon="cash"></i></span><span class="badge badge-good">Available</span></div>
+            <h3>Cash at the counter</h3>
+            <p>The customer sends the job, you collect the cash and tap <b>Approve</b>. Or turn on auto-approve and collect when they pick up.</p>
+          </div>
+          <div class="pay card">
+            <div class="pay-top"><span class="pay-ic"><i data-icon="card"></i></span><span class="badge badge-good">Available</span></div>
+            <h3>Safepay online</h3>
+            <p>Customers pay by debit or credit card through Safepay's secure hosted checkout. The money goes to your own Safepay account.</p>
+          </div>
+          <div class="pay card">
+            <div class="pay-top"><span class="pay-ic"><i data-icon="phone"></i></span><span class="badge badge-neutral">Coming soon</span></div>
+            <h3>JazzCash</h3>
+            <p>Pay from a JazzCash mobile wallet. We're finishing this integration — it will appear in your settings when it's ready.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="section section-alt" id="pricing">
+      <div class="container">
+        <div class="pricing card">
+          <div class="pricing-copy">
+            <span class="eyebrow">Pricing</span>
+            <h2 class="display">One simple <em>monthly plan.</em></h2>
+            <p>A flat monthly subscription per shop. No commission on prints — every rupee your customers pay goes to you.</p>
+            <a class="btn btn-primary btn-lg" href="#contact">Ask for pricing <i data-icon="arrowRight"></i></a>
+          </div>
+          <ul class="checklist">
+            <li><i data-icon="check"></i> Your own QR code and print page</li>
+            <li><i data-icon="check"></i> Shop dashboard with live jobs and earnings</li>
+            <li><i data-icon="check"></i> Cash and Safepay payments</li>
+            <li><i data-icon="check"></i> PDF, Word, Excel, PowerPoint and photo printing</li>
+            <li><i data-icon="check"></i> CNIC copies and passport photo sheets</li>
+            <li><i data-icon="check"></i> Print agent setup for your printer</li>
+            <li><i data-icon="check"></i> Support by email and WhatsApp</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq">
+      <div class="container narrow">
+        <div class="section-head">
+          <span class="eyebrow">FAQ</span>
+          <h2 class="display">Common <em>questions.</em></h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Do customers need to install an app?</summary>
+            <p>No. They scan the QR code with their phone camera and your shop's print page opens in the browser. Nothing to download and no account to create.</p>
+          </details>
+          <details>
+            <summary>Which files can customers print?</summary>
+            <p>PDF, Word (.doc, .docx), Excel, PowerPoint, OpenDocument, RTF and text files, plus JPG and PNG photos. The default limit is 25 MB per file, and you can change it in your settings.</p>
+          </details>
+          <details>
+            <summary>Can customers print a CNIC copy or passport photos?</summary>
+            <p>Yes. For an ID card copy they take a photo of the front and back, line each one up with the card frame, and both sides print on one page at real card size. For passport photos they choose 4 to 20 photos of 35 × 45 mm on one sheet, with cutting lines.</p>
+          </details>
+          <details>
+            <summary>Can customers send several files at once?</summary>
+            <p>Yes — up to 20 files in one order. They can choose which pages to print, rotate pages, and change the order. With double-sided printing, each file starts on a new sheet.</p>
+          </details>
+          <details>
+            <summary>What do I need in my shop?</summary>
+            <p>A printer, a Windows or Linux computer connected to it, and an internet connection. We set up the print agent on that computer and give you your QR code and dashboard login.</p>
+          </details>
+          <details>
+            <summary>How do I get paid?</summary>
+            <p>In cash at the counter, or online through your own Safepay merchant account. Print payments go directly to you. JazzCash wallet payments are coming soon.</p>
+          </details>
+          <details>
+            <summary>What happens if a print fails?</summary>
+            <p>If the printer jams or runs out of paper, the job is flagged on your dashboard. You can reprint it once the printer is ready, or refund it. The customer sees the status on their phone the whole time.</p>
+          </details>
+          <details>
+            <summary>Are customers' files kept private?</summary>
+            <p>Yes. Files are deleted automatically as soon as they print. Uploads that are never paid for are removed within 30 minutes, and job history is cleared after 7 days.</p>
+          </details>
+          <details>
+            <summary>Can it run without anyone at the counter?</summary>
+            <p>Yes. Kiosk mode is made for unattended use with online payment — if a job can't print, the customer's payment is refunded automatically.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section class="section section-alt" id="contact">
+      <div class="container">
+        <div class="contact-grid">
+          <div>
+            <span class="eyebrow">Contact</span>
+            <h2 class="display">Talk <em>to us.</em></h2>
+            <p class="section-lead left">Questions, a demo, or ready to set up your shop — write to us by email or WhatsApp, in English or Urdu.</p>
+            <div class="contact-cards">
+              <a class="contact-card card" href="mailto:{{CONTACT_EMAIL}}">
+                <span class="contact-ic"><i data-icon="mail"></i></span>
+                <span><span class="contact-k">Email</span><span class="contact-v">{{CONTACT_EMAIL}}</span></span>
+              </a>
+              <a class="contact-card card" href="{{WHATSAPP_LINK}}" target="_blank" rel="noopener">
+                <span class="contact-ic"><i data-icon="chat"></i></span>
+                <span><span class="contact-k">WhatsApp</span><span class="contact-v">{{CONTACT_WHATSAPP}}</span></span>
+              </a>
+            </div>
+          </div>
+          <div class="card card-pad help-card">
+            <h3>What we can help with</h3>
+            <ul class="help-list">
+              <li><b>Setting up a new shop</b><span>Your QR code, dashboard login, prices and payment method.</span></li>
+              <li><b>Printer and print agent</b><span>Installing the agent, connecting your printer, jobs that don't print.</span></li>
+              <li><b>Payments</b><span>Connecting Safepay, cash approvals and refunds.</span></li>
+              <li><b>Your subscription</b><span>Renewals, a paused service, or changing your plan.</span></li>
+            </ul>
+            <p class="help-note"><i data-icon="shield"></i> Please don't send passwords, OTPs or banking details — we will never ask for them.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Login band -->
+    <section class="section cta-section">
+      <div class="container">
+        <div class="cta card">
+          <div>
+            <h2>Already a QRPrint shop?</h2>
+            <p>Log in to see live jobs, earnings and your printer status.</p>
+          </div>
+          <a class="btn btn-primary btn-lg" href="/dashboard/">Shop login <i data-icon="arrowRight"></i></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/"><span class="brand-mark"><i data-icon="printer"></i></span><span>QR<b>Print</b></span></a>
+        <p>Self-service QR printing for print and photocopy shops in Pakistan.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#payments">Payments</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div>
+        <h4>For shops</h4>
+        <a href="/dashboard/">Shop login</a>
+        <a href="#contact">Get started</a>
+        <a href="#contact">Support</a>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <a href="mailto:{{CONTACT_EMAIL}}">{{CONTACT_EMAIL}}</a>
+        <a href="{{WHATSAPP_LINK}}" target="_blank" rel="noopener">WhatsApp {{CONTACT_WHATSAPP}}</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© {{YEAR}} QRPrint. All rights reserved.</span>
+      <span>Files are deleted automatically after printing.</span>
+    </div>
+  </footer>
+
+  <script src="/shared/ui.js"></script>
+  <script src="/site/site.js"></script>
+</body>
+</html>

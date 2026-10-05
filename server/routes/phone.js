@@ -15,6 +15,7 @@ import { createPayment } from '../payments.js';
 import { verifyCallback } from '../jazzcash.js';
 import { verifyCallback as verifySafepay, checkTrackerPaid } from '../safepay.js';
 import { isOfficeFile, officeToPdf } from '../office.js';
+import { idCardPdf, passportPdf, mergeFiles, PHOTO_COUNTS } from '../layout.js';
 import { uploadLimiter, payLimiter } from '../security.js';
 
 export const phoneRouter = express.Router();
@@ -33,7 +34,7 @@ const upload = multer({
   limits: { fileSize: config.maxUploadMb * 1024 * 1024, files: 1 },
 });
 
-const pending = new Map(); // fileId -> { path, pages, sizeBytes, createdAt }
+const pending = new Map(); // fileId -> { path, pages, sizeBytes, originalName, createdAt, kind }
 
 // Which shop is this request for? Slug from query/body/header; falls back to the
 // first shop so a legacy single-shop QR still works.
@@ -126,22 +127,154 @@ phoneRouter.post('/upload', uploadLimiter, (req, res) => {
 
     pending.set(base, {
       path: finalPdf, pages, sizeBytes: req.file.size,
-      originalName: req.file.originalname, createdAt: Date.now(),
+      originalName: req.file.originalname, createdAt: Date.now(), kind: 'doc',
     });
     res.json({ fileId: base, pages, sizeMb: +(req.file.size / 1048576).toFixed(2) });
   });
 });
 
+// --- ready-made layouts: ID card copy / passport photos ----------------------
+// The phone crops the photos to the right shape; the server places them on the
+// page at true size (see layout.js).
+const layoutUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024, files: 2, fields: 10 },
+});
+const LAYOUT_FIELDS = [{ name: 'front', maxCount: 1 }, { name: 'back', maxCount: 1 }, { name: 'photo', maxCount: 1 }];
+
+phoneRouter.post('/layout', uploadLimiter, (req, res) => {
+  layoutUpload.fields(LAYOUT_FIELDS)(req, res, async (err) => {
+    if (err) {
+      return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400)
+        .json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'This photo is too large.' : 'Upload failed. Please try again.' });
+    }
+    const shop = resolveShop(req);
+    if (!shop) return res.status(404).json({ error: 'Shop not found.' });
+    const sizes = shop.capabilities.paperSizes;
+    const paper = sizes.includes(req.body?.paperSize) ? req.body.paperSize : sizes[0];
+    const file = (name) => req.files?.[name]?.[0]?.buffer;
+    const kind = req.body?.kind;
+    try {
+      let bytes, name;
+      if (kind === 'idcard') {
+        if (!file('front') || !file('back')) return res.status(400).json({ error: 'Add both the front and the back of the card.' });
+        bytes = await idCardPdf(file('front'), file('back'), paper);
+        name = 'ID card copy (front & back)';
+      } else if (kind === 'passport') {
+        if (!file('photo')) return res.status(400).json({ error: 'Add a photo first.' });
+        const count = PHOTO_COUNTS.includes(Number(req.body?.count)) ? Number(req.body.count) : 8;
+        bytes = await passportPdf(file('photo'), count, paper);
+        name = `Passport photos × ${count}`;
+      } else {
+        return res.status(400).json({ error: 'Unknown layout.' });
+      }
+      const id = makeId('file');
+      const out = path.join(config.uploadsDir, id + '.pdf');
+      fs.writeFileSync(out, bytes);
+      pending.set(id, { path: out, pages: 1, sizeBytes: bytes.length, originalName: name, createdAt: Date.now(), kind });
+      res.json({ fileId: id, pages: 1, name });
+    } catch (e) {
+      if (e.code === 'BAD_IMAGE') return res.status(415).json({ error: 'Please use a JPG or PNG photo.' });
+      return res.status(422).json({ error: 'Could not use this photo. Please try another one.' });
+    }
+  });
+});
+
+// The converted PDF of an upload, so the phone can preview pages before
+// printing (Word/Excel files only exist as PDF after conversion). Pending
+// uploads only — never a file that already belongs to a job.
+phoneRouter.get('/files/:fileId', (req, res) => {
+  const up = pending.get(req.params.fileId);
+  if (!up || !fs.existsSync(up.path)) return res.status(404).json({ error: 'File not found.' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Cache-Control', 'private, no-store');
+  fs.createReadStream(up.path).pipe(res);
+});
+
 // --- create the job ----------------------------------------------------------
-phoneRouter.post('/jobs', (req, res) => {
-  const shop = resolveShop(req);
-  if (!shop) return res.status(404).json({ error: 'Shop not found.' });
+// Body: { files: [{ fileId, pages?: [{ n, rotate }] }], options }. Files print
+// in the order given; `pages` is the customer's page selection/rotation from
+// the editor (omitted = every page). Several files are merged into one PDF, so
+// the print agent always receives a single ready-to-print document.
+const MAX_FILES = 20;
 
-  if (!canAcceptJobs(shop)) {
-    return res.status(403).json({ error: statusMessage(shop).message, code: 'suspended' });
-  }
+phoneRouter.post('/jobs', async (req, res, next) => {
+  try {
+    const shop = resolveShop(req);
+    if (!shop) return res.status(404).json({ error: 'Shop not found.' });
 
-  const { fileId, options = {} } = req.body || {};
+    if (!canAcceptJobs(shop)) {
+      return res.status(403).json({ error: statusMessage(shop).message, code: 'suspended' });
+    }
+
+    const body = req.body || {};
+    // Older page versions send one fileId; the agent applies options.pageRange.
+    if (body.fileId && !Array.isArray(body.files)) return createLegacyJob(req, res, shop);
+
+    const list = Array.isArray(body.files) ? body.files : [];
+    if (!list.length) return res.status(400).json({ error: 'Add a file to print.' });
+    if (list.length > MAX_FILES) return res.status(400).json({ error: `You can print up to ${MAX_FILES} files at once.` });
+
+    const items = [];
+    for (const f of list) {
+      const fileId = String(f?.fileId || '');
+      const up = pending.get(fileId);
+      if (!up) return res.status(410).json({ error: 'An upload expired. Please add that file again.' });
+      if (items.some(i => i.fileId === fileId)) return res.status(400).json({ error: 'The same file was added twice.' });
+      const pages = cleanPages(f.pages, up.pages);
+      if (pages && !pages.length) return res.status(400).json({ error: `Choose at least one page of ${up.originalName}.` });
+      items.push({ fileId, up, pages });
+    }
+
+    const kinds = new Set(items.map(i => i.up.kind || 'doc'));
+    const kind = kinds.size === 1 ? [...kinds][0] : 'doc';
+    const opts = normaliseOptions(body.options || {}, shop);
+    opts.pageRange = '';                       // the page choice is applied below
+    if (kind !== 'doc') { opts.duplex = 'single'; opts.scale = 'actual'; }   // true-size card / photos
+
+    // One unedited file prints as uploaded; anything else is merged.
+    let storedPath, contentPages, totalPages;
+    if (items.length === 1 && !items[0].pages) {
+      storedPath = items[0].up.path;
+      contentPages = totalPages = items[0].up.pages;
+    } else {
+      const merged = await mergeFiles(items.map(i => ({ path: i.up.path, pages: i.pages })), { duplex: opts.duplex });
+      storedPath = path.join(config.uploadsDir, makeId('file') + '.pdf');
+      fs.writeFileSync(storedPath, merged.bytes);
+      ({ contentPages, totalPages } = merged);
+      for (const i of items) safeUnlink(i.up.path);
+    }
+    for (const i of items) pending.delete(i.fileId);
+
+    const price = computePrice(shop, contentPages, opts);   // blank padding pages aren't charged
+    const first = items[0].up.originalName;
+    const job = {
+      id: makeId('job'),
+      shopId: shop.id,
+      kind,
+      createdAt: new Date().toISOString(),
+      file: {
+        storedPath,
+        originalName: items.length > 1 ? `${first} + ${items.length - 1} more` : first,
+        pages: totalPages,
+        contentPages,
+        sizeBytes: items.reduce((n, i) => n + (i.up.sizeBytes || 0), 0),
+        items: items.map(i => ({ name: i.up.originalName, pages: i.pages ? i.pages.length : i.up.pages })),
+      },
+      options: opts,
+      price,
+      payment: { status: 'unpaid', provider: null, ref: null, paidAt: null },
+      print: { status: 'awaiting_payment', attempts: 0, error: null, printedAt: null },
+    };
+
+    db.addJob(job);
+    db.logEvent('job.created', { shopId: shop.id, jobId: job.id, amount: price.amount, pages: contentPages, files: items.length, kind });
+    res.json(publicJob(job));
+  } catch (e) { next(e); }
+});
+
+function createLegacyJob(req, res, shop) {
+  const { fileId, options = {} } = req.body;
   const up = pending.get(fileId);
   if (!up) return res.status(410).json({ error: 'Upload expired. Please select the file again.' });
 
@@ -151,6 +284,7 @@ phoneRouter.post('/jobs', (req, res) => {
   const job = {
     id: makeId('job'),
     shopId: shop.id,
+    kind: up.kind || 'doc',
     createdAt: new Date().toISOString(),
     file: { storedPath: up.path, originalName: up.originalName, pages: up.pages, sizeBytes: up.sizeBytes },
     options: opts,
@@ -163,13 +297,30 @@ phoneRouter.post('/jobs', (req, res) => {
   db.addJob(job);
   db.logEvent('job.created', { shopId: shop.id, jobId: job.id, amount: price.amount, pages: up.pages });
   res.json(publicJob(job));
-});
+}
+
+// Page choice from the editor -> [{ n, rotate }] in print order, or null for
+// "every page, unchanged". Anything malformed is dropped.
+function cleanPages(pages, total) {
+  if (!Array.isArray(pages)) return null;
+  const out = [];
+  for (const p of pages.slice(0, 5000)) {
+    const n = parseInt(p?.n, 10);
+    if (!(n >= 1 && n <= total)) continue;
+    const r = parseInt(p?.rotate, 10);
+    out.push({ n, rotate: [90, 180, 270].includes(r) ? r : 0 });
+  }
+  const unchanged = out.length === total && out.every((p, i) => p.n === i + 1 && !p.rotate);
+  return unchanged ? null : out;
+}
 
 // --- pay ---------------------------------------------------------------------
 phoneRouter.post('/jobs/:id/pay', payLimiter, async (req, res) => {
   const job = db.job(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found.' });
-  if (job.payment.status === 'paid') return res.json(publicJob(job));
+  // Only an unpaid job can start a payment (a paid, refunded or counter job
+  // just reports where it is — it can't be "paid" again and re-queued).
+  if (job.payment.status !== 'unpaid') return res.json(publicJob(job));
 
   const shop = db.shop(job.shopId);
   if (!shop) return res.status(404).json({ error: 'Shop not found.' });
@@ -231,7 +382,12 @@ phoneRouter.post('/pay/jazzcash/callback', express.urlencoded({ extended: false 
   const shop = job ? db.shop(job.shopId) : null;
   const salt = shop?.payment_account?.jazzcash?.integritySalt;
   const v = verifyCallback(req.body || {}, salt);
-  if (job && v.ok && v.success && job.payment.status !== 'paid') {
+  // The signed result must also be for THIS job's transaction and full amount.
+  if (v.ok && job && (v.txnRef !== job.payment.txnRef
+      || String(req.body?.pp_Amount) !== String(Math.round(job.price.amount * 100)))) {
+    v.ok = false; v.success = false;
+  }
+  if (job && v.ok && v.success && job.payment.status === 'unpaid') {
     db.updateJob(job.id, {
       payment: { ...job.payment, status: 'paid', provider: 'jazzcash', ref: v.txnRef, paidAt: new Date().toISOString() },
       print: { ...job.print, status: 'queued' },
@@ -246,26 +402,36 @@ phoneRouter.post('/pay/jazzcash/callback', express.urlencoded({ extended: false 
 });
 
 // Safepay sends the result here (GET or POST). Verify the signature, mark paid.
-phoneRouter.all('/pay/safepay/callback', express.urlencoded({ extended: false }), (req, res) => {
+phoneRouter.all('/pay/safepay/callback', express.urlencoded({ extended: false }), async (req, res) => {
   const params = { ...req.query, ...(req.body || {}) };
-  const orderId = params.order_id || params.orderId || '';
+  const orderId = String(params.order_id || params.orderId || '');
   const job = orderId ? db.job(orderId) : null;
   const shop = job ? db.shop(job.shopId) : null;
   const secret = shop?.payment_account?.safepay?.secretKey;
   const v = verifySafepay(params, secret);
+  // A signature only proves Safepay issued that tracker — not that it belongs
+  // to this job. Without this check a receipt from a cheap job could be
+  // replayed against an expensive one.
+  const ownTracker = !!job?.payment.token && v.tracker === job.payment.token;
   // Log the callback shape so the exact field names are confirmable after the
   // first real payment (values omitted; keys only).
-  db.logEvent('safepay.callback', { shopId: job?.shopId, jobId: orderId, keys: Object.keys(params).join(','), verified: v.ok });
-  if (job && v.ok && job.payment.status !== 'paid') {
-    db.updateJob(job.id, {
-      payment: { ...job.payment, status: 'paid', provider: 'safepay', ref: v.tracker, paidAt: new Date().toISOString() },
-      print: { ...job.print, status: 'queued' },
-    });
-    db.logEvent('job.paid', { shopId: job.shopId, jobId: job.id, provider: 'safepay', amount: job.price.amount });
-  } else if (job && !v.ok) {
-    db.logEvent('job.pay_failed', { shopId: job.shopId, jobId: job.id, provider: 'safepay' });
+  db.logEvent('safepay.callback', { shopId: job?.shopId, jobId: orderId, keys: Object.keys(params).join(','), verified: v.ok && ownTracker });
+  let paid = job?.payment.status === 'paid';
+  if (job && job.payment.status === 'unpaid' && job.payment.provider === 'safepay' && job.payment.token) {
+    // Signed + matching tracker, or Safepay itself says this job's tracker is paid.
+    if (v.ok && ownTracker) {
+      db.updateJob(job.id, {
+        payment: { ...job.payment, status: 'paid', ref: job.payment.token, paidAt: new Date().toISOString() },
+        print: { ...job.print, status: 'queued' },
+      });
+      db.logEvent('job.paid', { shopId: job.shopId, jobId: job.id, provider: 'safepay', amount: job.price.amount });
+      paid = true;
+    } else {
+      paid = await settleSafepay(job);
+    }
+    if (!paid) db.logEvent('job.pay_failed', { shopId: job.shopId, jobId: job.id, provider: 'safepay' });
   }
-  const status = v.ok ? 'paid' : 'failed';
+  const status = paid ? 'paid' : 'failed';
   const s = shop?.slug ? `&s=${encodeURIComponent(shop.slug)}` : '';
   res.redirect(`/p/?job=${encodeURIComponent(orderId)}&pay=${status}${s}`);
 });
@@ -329,7 +495,8 @@ function publicJob(job) {
   return {
     id: job.id,
     createdAt: job.createdAt,
-    file: { originalName: job.file.originalName, pages: job.file.pages },
+    kind: job.kind || 'doc',
+    file: { originalName: job.file.originalName, pages: job.file.pages, items: job.file.items || null },
     options: job.options,
     price: job.price,
     payment: { status: job.payment.status, ref: job.payment.ref, payAtCounter: !!job.payment.auto },
