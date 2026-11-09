@@ -189,7 +189,8 @@ recoverTimer.unref();
 const sweepTimer = setInterval(() => { sweepSafepay().catch(() => {}); }, 20 * 1000);
 sweepTimer.unref();
 
-const server = app.listen(config.port, () => {
+// HOST=127.0.0.1 keeps it reachable only through the tunnel on a shared server.
+const server = app.listen({ port: config.port, host: process.env.HOST || undefined }, () => {
   const url = config.publicUrl || `http://${lanIp()}:${config.port}`;
   console.log('\n  QRPrint server running  [' + config.env + ']');
   console.log('  ----------------------------------------');
