@@ -51,7 +51,7 @@ export const config = {
   // Public contact details shown on the homepage and in the shop dashboard.
   contact: {
     email: process.env.CONTACT_EMAIL || 'ryaan.epk@gmail.com',
-    whatsapp: process.env.CONTACT_WHATSAPP || '+92 332 522 4700',
+    whatsapp: process.env.CONTACT_WHATSAPP || '+92 309 8480389',
   },
 
   // Per-shop JazzCash checkout isn't finished yet (see JAZZCASH.md). Until it
