@@ -81,6 +81,11 @@ export function validateProd() {
   if (config.agentKey === DEV_AGENT_KEY) problems.push('AGENT_KEY is still the dev default');
   if (config.adminKey === DEV_ADMIN_KEY) problems.push('ADMIN_KEY is still the dev default');
   if (!process.env.SESSION_SECRET) problems.push('SESSION_SECRET is not set');
+  // A short key can be guessed: a 4-digit admin key falls to 10,000 tries. 32+ random
+  // characters (what `npm run setup` makes) can't be.
+  for (const [name, value] of [['ADMIN_KEY', config.adminKey], ['AGENT_KEY', config.agentKey], ['SESSION_SECRET', process.env.SESSION_SECRET]]) {
+    if (value && String(value).length < 32) problems.push(`${name} is too short (use 32+ random characters, e.g. openssl rand -hex 24)`);
+  }
   if (!config.publicUrl) problems.push('PUBLIC_URL is not set (needed for the QR + payment callbacks)');
   if (config.paymentProvider === 'jazzcash') {
     if (!config.jazzcash.merchantId) problems.push('JAZZCASH_MERCHANT_ID is not set');

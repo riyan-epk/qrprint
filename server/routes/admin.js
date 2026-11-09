@@ -4,7 +4,7 @@ import express from 'express';
 import { config } from '../config.js';
 import { db, randomKey } from '../db.js';
 import { effectiveStatus, setSubscription } from '../subscription.js';
-import { requireAdmin, hashPassword, MIN_PASSWORD } from '../security.js';
+import { requireAdmin, hashPassword, MIN_PASSWORD, shopLoginFailures } from '../security.js';
 
 export const adminRouter = express.Router();
 adminRouter.use(express.json());
@@ -87,6 +87,7 @@ adminRouter.post('/shops/:id/password', (req, res) => {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
   }
   db.updateShop(shop.id, { auth: { passwordHash: hashPassword(password) } });
+  shopLoginFailures.succeeded(shop.id);   // a reset also lifts a wrong-password lock
   db.logEvent('shop.password_set', { shopId: shop.id });
   res.json({ ok: true });
 });

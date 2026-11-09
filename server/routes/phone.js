@@ -62,8 +62,24 @@ phoneRouter.get('/config', (req, res) => {
   });
 });
 
+// Keep this much disk free, so a flood of uploads can't fill the server and stop
+// everything else (the job list, the logs) from being written.
+const MIN_FREE_BYTES = 1.5 * 1024 * 1024 * 1024;
+function diskFull() {
+  try {
+    const s = fs.statfsSync(config.uploadsDir);
+    return s.bavail * s.bsize < MIN_FREE_BYTES;
+  } catch { return false; }
+}
+
+// A file name is only ever shown back, so a sensible length is plenty.
+const cleanName = (name) => String(name || 'file').replace(/[\u0000-\u001f]/g, '').slice(0, 120);
+
 // --- upload + validate the document -----------------------------------------
 phoneRouter.post('/upload', uploadLimiter, (req, res) => {
+  if (diskFull()) {
+    return res.status(503).json({ error: 'The print service is very busy right now. Please try again in a few minutes.' });
+  }
   upload.single('file')(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -72,6 +88,20 @@ phoneRouter.post('/upload', uploadLimiter, (req, res) => {
       return res.status(400).json({ error: 'Upload failed. Please try again.' });
     }
     if (!req.file) return res.status(400).json({ error: 'No file received.' });
+
+    // Only for a shop that exists and is taking jobs, and within that shop's own size limit.
+    const shop = resolveShop(req);
+    if (!shop || !canAcceptJobs(shop)) {
+      safeUnlink(req.file.path);
+      return shop
+        ? res.status(403).json({ error: statusMessage(shop).message, code: 'suspended' })
+        : res.status(404).json({ error: 'Shop not found.' });
+    }
+    const shopMax = Number(shop.capabilities?.maxFileMb) || config.maxUploadMb;
+    if (req.file.size > Math.min(shopMax, config.maxUploadMb) * 1024 * 1024) {
+      safeUnlink(req.file.path);
+      return res.status(413).json({ error: `File too large. Max ${Math.min(shopMax, config.maxUploadMb)} MB.` });
+    }
 
     const uploaded = req.file.path;                     // uploads/file_xxx.ext
     const ext = path.extname(uploaded).toLowerCase();
@@ -91,9 +121,13 @@ phoneRouter.post('/upload', uploadLimiter, (req, res) => {
     let pages;
     try {
       if (isPdf) {
+        // Store the PDF as pdf-lib rewrites it, never the uploaded bytes. A crafted PDF can
+        // show one page count to pdf-lib (which sets the price) and another to the printer
+        // program; after the rewrite both read the same pages, so every printed page is paid for.
         const doc = await PDFDocument.load(fs.readFileSync(uploaded), { ignoreEncryption: false });
         pages = doc.getPageCount();
-        if (uploaded !== finalPdf) { fs.renameSync(uploaded, finalPdf); }
+        fs.writeFileSync(finalPdf, await doc.save());
+        if (uploaded !== finalPdf) safeUnlink(uploaded);
       } else if (isImg) {
         const pdfBytes = await imageToPdf(fs.readFileSync(uploaded), ext === '.png' || mime === 'image/png');
         fs.writeFileSync(finalPdf, pdfBytes);
@@ -127,7 +161,7 @@ phoneRouter.post('/upload', uploadLimiter, (req, res) => {
 
     pending.set(base, {
       path: finalPdf, pages, sizeBytes: req.file.size,
-      originalName: req.file.originalname, createdAt: Date.now(), kind: 'doc',
+      originalName: cleanName(req.file.originalname), createdAt: Date.now(), kind: 'doc',
     });
     res.json({ fileId: base, pages, sizeMb: +(req.file.size / 1048576).toFixed(2) });
   });
@@ -143,6 +177,9 @@ const layoutUpload = multer({
 const LAYOUT_FIELDS = [{ name: 'front', maxCount: 1 }, { name: 'back', maxCount: 1 }, { name: 'photo', maxCount: 1 }];
 
 phoneRouter.post('/layout', uploadLimiter, (req, res) => {
+  if (diskFull()) {
+    return res.status(503).json({ error: 'The print service is very busy right now. Please try again in a few minutes.' });
+  }
   layoutUpload.fields(LAYOUT_FIELDS)(req, res, async (err) => {
     if (err) {
       return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400)
@@ -150,6 +187,7 @@ phoneRouter.post('/layout', uploadLimiter, (req, res) => {
     }
     const shop = resolveShop(req);
     if (!shop) return res.status(404).json({ error: 'Shop not found.' });
+    if (!canAcceptJobs(shop)) return res.status(403).json({ error: statusMessage(shop).message, code: 'suspended' });
     const sizes = shop.capabilities.paperSizes;
     const paper = sizes.includes(req.body?.paperSize) ? req.body.paperSize : sizes[0];
     const file = (name) => req.files?.[name]?.[0]?.buffer;
@@ -376,7 +414,7 @@ phoneRouter.post('/jobs/:id/pay', payLimiter, async (req, res) => {
 });
 
 // JazzCash callback.
-phoneRouter.post('/pay/jazzcash/callback', express.urlencoded({ extended: false }), (req, res) => {
+phoneRouter.post('/pay/jazzcash/callback', payLimiter, express.urlencoded({ extended: false, limit: '20kb' }), (req, res) => {
   const jobId = req.body?.ppmpf_1;
   const job = jobId ? db.job(jobId) : null;
   const shop = job ? db.shop(job.shopId) : null;
@@ -394,7 +432,7 @@ phoneRouter.post('/pay/jazzcash/callback', express.urlencoded({ extended: false 
     });
     db.logEvent('job.paid', { shopId: job.shopId, jobId: job.id, provider: 'jazzcash', amount: job.price.amount });
   } else if (job && (!v.ok || !v.success)) {
-    db.logEvent('job.pay_failed', { shopId: job.shopId, jobId: job.id, code: v.responseCode });
+    db.logEvent('job.pay_failed', { shopId: job.shopId, jobId: job.id, code: String(v.responseCode ?? '').slice(0, 16) });
   }
   const status = v.ok && v.success ? 'paid' : 'failed';
   const s = shop?.slug ? `&s=${encodeURIComponent(shop.slug)}` : '';
@@ -402,9 +440,9 @@ phoneRouter.post('/pay/jazzcash/callback', express.urlencoded({ extended: false 
 });
 
 // Safepay sends the result here (GET or POST). Verify the signature, mark paid.
-phoneRouter.all('/pay/safepay/callback', express.urlencoded({ extended: false }), async (req, res) => {
+phoneRouter.all('/pay/safepay/callback', payLimiter, express.urlencoded({ extended: false, limit: '20kb' }), async (req, res) => {
   const params = { ...req.query, ...(req.body || {}) };
-  const orderId = String(params.order_id || params.orderId || '');
+  const orderId = String(params.order_id || params.orderId || '').slice(0, 64);
   const job = orderId ? db.job(orderId) : null;
   const shop = job ? db.shop(job.shopId) : null;
   const secret = shop?.payment_account?.safepay?.secretKey;
@@ -414,8 +452,13 @@ phoneRouter.all('/pay/safepay/callback', express.urlencoded({ extended: false })
   // replayed against an expensive one.
   const ownTracker = !!job?.payment.token && v.tracker === job.payment.token;
   // Log the callback shape so the exact field names are confirmable after the
-  // first real payment (values omitted; keys only).
-  db.logEvent('safepay.callback', { shopId: job?.shopId, jobId: orderId, keys: Object.keys(params).join(','), verified: v.ok && ownTracker });
+  // first real payment (values omitted; keys only). Only for a real job, and kept
+  // short: anyone can call this address, and the event log must not be a place to
+  // pour data into until the server runs out of room.
+  if (job) {
+    const keys = Object.keys(params).slice(0, 20).map(k => k.slice(0, 32)).join(',');
+    db.logEvent('safepay.callback', { shopId: job.shopId, jobId: job.id, keys, verified: v.ok && ownTracker });
+  }
   let paid = job?.payment.status === 'paid';
   if (job && job.payment.status === 'unpaid' && job.payment.provider === 'safepay' && job.payment.token) {
     // Signed + matching tracker, or Safepay itself says this job's tracker is paid.
@@ -486,7 +529,7 @@ function normaliseOptions(options, shop) {
   return {
     copies: clampInt(options.copies, 1, 999, 1),
     color, duplex,
-    pageRange: typeof options.pageRange === 'string' ? options.pageRange.trim() : '',
+    pageRange: typeof options.pageRange === 'string' ? options.pageRange.trim().slice(0, 100) : '',
     paperSize,
   };
 }

@@ -8,7 +8,7 @@ import { effectiveStatus, statusMessage } from '../subscription.js';
 import { refund } from '../payments.js';
 import { overallStatus } from './phone.js';
 import { clampInt } from '../pricing.js';
-import { requireShopAuth, verifyPassword, hashPassword, setShopSession, MIN_PASSWORD } from '../security.js';
+import { requireShopAuth, verifyPasswordAsync, hashPassword, setShopSession, MIN_PASSWORD, shopLoginFailures } from '../security.js';
 
 export const dashboardRouter = express.Router();
 dashboardRouter.use(requireShopAuth);
@@ -155,14 +155,18 @@ dashboardRouter.post('/jobs/:id/refund', async (req, res) => {
 });
 
 // Shopkeeper changes their own password.
-dashboardRouter.post('/change-password', (req, res) => {
+dashboardRouter.post('/change-password', async (req, res) => {
   const shop = db.shop(req.shopId);
   const { currentPassword, newPassword } = req.body || {};
   if (!newPassword || String(newPassword).length < MIN_PASSWORD) {
     return res.status(400).json({ error: `New password must be at least ${MIN_PASSWORD} characters.` });
   }
+  // Someone at an unlocked dashboard still can't guess the current password over and over.
+  const locked = shopLoginFailures.lockedFor(shop.id);
+  if (locked) return res.status(429).json({ error: `Too many wrong passwords. Please wait ${locked} minute${locked === 1 ? '' : 's'}.` });
   const hash = shop.auth?.passwordHash;
-  if (hash && !verifyPassword(currentPassword || '', hash)) {
+  if (hash && !(await verifyPasswordAsync(currentPassword || '', hash))) {
+    shopLoginFailures.failed(shop.id);
     return res.status(401).json({ error: 'Current password is wrong.' });
   }
   const updated = db.updateShop(shop.id, { auth: { passwordHash: hashPassword(String(newPassword)) } });

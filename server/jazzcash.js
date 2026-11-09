@@ -54,14 +54,22 @@ export function buildCheckout(job, shop, creds, now = new Date()) {
   };
   fields.pp_SecureHash = secureHash(fields, creds.integritySalt);
 
-  return { ok: true, action: SANDBOX_URL, fields, txnRef };
+  // JAZZCASH_BASE_URL picks sandbox or live; sandbox until it is set.
+  return { ok: true, action: config.jazzcash?.baseUrl || SANDBOX_URL, fields, txnRef };
+}
+
+// Same-length strings compared in constant time, so the answer time gives no hint.
+function sameText(a, b) {
+  const x = Buffer.from(String(a || ''));
+  const y = Buffer.from(String(b || ''));
+  return x.length > 0 && x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
 // Validate the callback using the shop's integrity salt.
 export function verifyCallback(body, integritySalt) {
   const received = body.pp_SecureHash;
   const expected = integritySalt ? secureHash(body, integritySalt) : '';
-  const valid = received && expected && received.toUpperCase() === expected;
+  const valid = !!expected && sameText(String(received || '').toUpperCase(), expected);
   return {
     ok: valid,
     success: valid && body.pp_ResponseCode === '000',
